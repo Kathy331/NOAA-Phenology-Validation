@@ -26,7 +26,7 @@ The script rn loops over every `test/data/ex--/` folder that contains one `*_ndv
 - `test/output/ex2.png`
 - ....
 
-### IMPORTANT NOTES
+## IMPORTANT NOTES
 
 Set the preferred year at the top of `test/test.py` (`YEAR = 2024`).
 
@@ -40,10 +40,6 @@ Each CSV may cover different years. The script uses `YEAR` when that year exists
 *Add a new example by creating `data/ex3/` with one `*_ndvi_3day.csv` inside.
 
 *Other potential file is gcc 3day transition day files which can be download from gcc data tab in phenocam and it's in data_record_5 folder but don't need that right now.
-
-## Phenology
-
-`test/PhenoloDates.py` defines `CCRmax_SOS`, `CCRmax_EOS`, and `compute_phases`. Details: [`doc/IMPLEMENTATION.md`](doc/IMPLEMENTATION.md).
 
 ## Data source
 
