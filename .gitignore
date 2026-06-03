@@ -1,4 +1,3 @@
 #ignore doc folder for now
 doc/
-
-test/
+test/__pycache__/
