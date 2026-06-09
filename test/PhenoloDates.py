@@ -41,7 +41,7 @@ def _fit_logistic(t: np.ndarray, y: np.ndarray):
 
 	The amplitude c and background d are estimated up front from robust 5th/95th
 	percentiles, so only the two shape parameters a and b are optimized. Fixing
-	the level this way keeps the fit stable on short or noisy half-seasons.
+	the level this way keeps the fit stable on short or noisy half seasons 
 	"""
 	background = np.percentile(y, 5)              # d: dormant / baseline VI
 	amplitude = np.percentile(y, 95) - background  # c: seasonal range
@@ -61,9 +61,9 @@ def _fit_logistic(t: np.ndarray, y: np.ndarray):
 def _curvature_change_rate(t: np.ndarray, a: float, b: float, c: float):
 	"""Analytic rate of change of curvature K'(t) for the fitted logistic.
 
-	This is the closed-form expression derived in Zhang et al. (2003). Evaluating
-	it on a 1-day grid lets us pick transition dates as extrema of K'.
-	Returns (days, k_prime) over the integer DOY span of t.
+	This is the closed form expression derived in Zhang et al. (2003). Evaluating
+	it on a 1 day grid lets us pick transition dates as extrema of K'.
+	Returns (days, k_prime) over the integer DOY span of t
 	"""
 	days = np.arange(t[0], t[-1] + 1)
 	z = np.exp(a + b * days)
@@ -82,7 +82,7 @@ def _curvature_change_rate(t: np.ndarray, a: float, b: float, c: float):
 
 
 def _green_up_half(doy, values):
-	"""Fit the start of year → peak segment; return (days, k_prime) or None"""
+	"""Fit the start of year --> peak segment; return (days, k_prime) or None"""
 	t, y = _clean(doy, values)
 	if len(t) < MIN_POINTS:
 		return None
@@ -98,7 +98,7 @@ def _green_up_half(doy, values):
 
 
 def _senescence_half(doy, values):
-	"""Fit the peak → end of year segment; return (days, k_prime) or None"""
+	"""Fit the peak --> end of year segment; return (days, k_prime) or None"""
 	t, y = _clean(doy, values)
 	if len(t) < MIN_POINTS:
 		return None
@@ -150,7 +150,7 @@ def CCRmax_EOS(doy, values) -> tuple[float, float]:
 
 
 def compute_phases(doy, values) -> dict[str, float]:
-	"""All four phases as {"SOS", "MOS", "DOS", "EOS"} in DOY floats."""
+	"""All four phases as {"SOS", "MOS", "DOS", "EOS"} in DOY floats"""
 	sos, mos = CCRmax_SOS(doy, values)
 	dos, eos = CCRmax_EOS(doy, values)
 	return {"SOS": sos, "MOS": mos, "DOS": dos, "EOS": eos}

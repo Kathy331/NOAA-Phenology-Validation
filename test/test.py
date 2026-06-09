@@ -22,6 +22,9 @@ PHASES = {
 }
 LABEL_Y = 1.08
 LABEL_X_PAD = pd.Timedelta(days=1)
+# Distinct markers within this distance would overlap, so their labels are
+# split: the earlier one is placed left of its line, the later one right of it.
+LABEL_CLUSTER_GAP = pd.Timedelta(days=20)
 
 
 def find_timeseries_files(data_dir: Path) -> list[tuple[str, Path]]:
@@ -100,12 +103,42 @@ def collect_phase_markers(
 	return markers
 
 
+def assign_label_sides(markers: list[dict]) -> list[dict]:
+	"""Order markers by date and tag each with a label "side".
+
+	Markers that sit closer than LABEL_CLUSTER_GAP form a cluster. Within a
+	cluster the earliest keeps its label on the left of its line and the rest go
+	to the right, so overlapping markers stay individually readable. Isolated
+	markers default to the right.
+	"""
+	ordered = sorted(markers, key=lambda m: m["date"])
+
+	cluster: list[dict] = []
+	for marker in ordered:
+		if cluster and (marker["date"] - cluster[-1]["date"]) > LABEL_CLUSTER_GAP:
+			_set_cluster_sides(cluster)
+			cluster = []
+		cluster.append(marker)
+	_set_cluster_sides(cluster)
+	return ordered
+
+
+def _set_cluster_sides(cluster: list[dict]) -> None:
+	for index, marker in enumerate(cluster):
+		# Single marker or any after the first sits right; the earliest sits left.
+		marker["side"] = "left" if len(cluster) > 1 and index == 0 else "right"
+
+
 def draw_phases(ax, gcc_dates: dict[str, pd.Timestamp], ndvi_dates: dict[str, pd.Timestamp]) -> None:
 	label_transform = ax.get_xaxis_transform()
 
-	for marker in collect_phase_markers(gcc_dates, ndvi_dates):
+	markers = assign_label_sides(collect_phase_markers(gcc_dates, ndvi_dates))
+	for marker in markers:
 		style = marker["style"]
 		line_date = marker["date"]
+		on_left = marker["side"] == "left"
+		label_x = line_date - LABEL_X_PAD if on_left else line_date + LABEL_X_PAD
+		label_ha = "right" if on_left else "left"
 
 		ax.axvline(
 			line_date,
@@ -115,14 +148,14 @@ def draw_phases(ax, gcc_dates: dict[str, pd.Timestamp], ndvi_dates: dict[str, pd
 			alpha=0.85,
 		)
 		ax.text(
-			line_date + LABEL_X_PAD,
+			label_x,
 			LABEL_Y,
 			marker["label"],
 			transform=label_transform,
 			color=style["color"],
 			rotation=90,
 			verticalalignment="bottom",
-			horizontalalignment="left",
+			horizontalalignment=label_ha,
 			fontsize=8,
 			bbox={"boxstyle": "round,pad=0.25", "facecolor": "white", "edgecolor": style["color"], "alpha": 0.9},
 			clip_on=False,
