@@ -35,7 +35,7 @@ Each CSV may cover different years. The script uses `YEAR` when that year exists
 - `ex1` --> 2024 
 - `ex2` --> for ex, fall back to 2022 bc there is no 2024 data
 
-*Only the NDVI summary CSV is required (it includes `gcc_90`). 
+*Only the NDVI summary CSV is required (it includes `gcc_90`) from the phenocam website 
 
 *Add a new example by creating `data/ex3/` with one `*_ndvi_3day.csv` inside.
 
