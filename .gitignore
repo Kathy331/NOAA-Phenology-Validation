@@ -1,3 +1,5 @@
-#ignore doc folder for now
-doc/
 test/__pycache__/
+.venv/
+
+#personal notes
+local_notes/
