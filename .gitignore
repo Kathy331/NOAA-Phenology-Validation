@@ -1,5 +1,6 @@
 test/__pycache__/
 .venv/
+test/api/__pycache__/
 
 #personal notes
 local_notes/

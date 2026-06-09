@@ -1,0 +1,93 @@
+"""Fetch PhenoCam metadata and summary time series from the public API/archive.
+
+The PhenoCam REST API (https://phenocam.nau.edu/api/) exposes metadata such as
+the ROI list (/api/roilists/). The actual 3-day summary CSVs are served as static
+files under the data archive:
+
+    https://phenocam.nau.edu/data/archive/{site}/ROI/{site}_{veg}_{roi}_ndvi_3day.csv
+
+Typical use: resolve a site name to its ROI metadata with find_roi(), then download
+the NDVI series with fetch_ndvi_3day_for_roi(). The returned text buffer is read by
+data_io.load_timeseries exactly like a local CSV.
+"""
+
+import io
+import json
+import urllib.request
+
+API_BASE = "https://phenocam.nau.edu/api"
+ARCHIVE_BASE = "https://phenocam.nau.edu/data/archive"
+# The roilists endpoint has no server-side filtering, so we request every record
+# in a single page and filter client-side.
+ROILIST_PAGE_SIZE = 2000
+
+
+def fetch_json(url: str, timeout: float = 30.0) -> dict:
+	with urllib.request.urlopen(url, timeout=timeout) as response:
+		return json.loads(response.read().decode("utf-8"))
+
+
+def fetch_csv_text(url: str, timeout: float = 30.0) -> str:
+	"""Download a CSV from the archive and return its raw text."""
+	with urllib.request.urlopen(url, timeout=timeout) as response:
+		return response.read().decode("utf-8")
+
+
+def list_rois(timeout: float = 30.0) -> list[dict]:
+	"""Return every ROI metadata record from /api/roilists/."""
+	url = f"{API_BASE}/roilists/?format=json&limit={ROILIST_PAGE_SIZE}"
+	return fetch_json(url, timeout=timeout)["results"]
+
+
+def find_roi(
+	site: str,
+	roitype: str | None = None,
+	sequence_number: int | None = None,
+	rois: list[dict] | None = None,
+	timeout: float = 30.0,
+) -> dict:
+	"""Resolve a site name to a single ROI metadata record.
+
+	Optionally narrow by vegetation type and ROI sequence number. When several
+	ROIs match, the lowest sequence number wins, so a bare site name resolves to
+	its primary ROI. Pass a pre-fetched `rois` list to avoid repeat downloads.
+	"""
+	rois = rois if rois is not None else list_rois(timeout=timeout)
+	matches = [r for r in rois if r["site"] == site]
+	if roitype is not None:
+		matches = [r for r in matches if r["roitype"] == roitype]
+	if sequence_number is not None:
+		matches = [r for r in matches if r["sequence_number"] == sequence_number]
+	if not matches:
+		raise ValueError(
+			f"No ROI found for site={site!r} (roitype={roitype}, sequence_number={sequence_number})"
+		)
+	return min(matches, key=lambda r: r["sequence_number"])
+
+
+def ndvi_3day_url(site: str, veg_type: str, roi_id: int | str) -> str:
+	"""URL of the {site}_{veg}_{roi}_ndvi_3day.csv summary file."""
+	filename = f"{site}_{veg_type}_{roi_id}_ndvi_3day.csv"
+	return f"{ARCHIVE_BASE}/{site}/ROI/{filename}"
+
+
+def roi_ndvi_3day_url(roi: dict) -> str:
+	"""NDVI 3-day summary URL derived from an ROI metadata record."""
+	return ndvi_3day_url(roi["site"], roi["roitype"], roi["sequence_number"])
+
+
+def fetch_ndvi_3day(site: str, veg_type: str, roi_id: int | str, timeout: float = 30.0) -> io.StringIO:
+	"""Download an NDVI 3-day summary by explicit site/veg/ROI as a text buffer."""
+	text = fetch_csv_text(ndvi_3day_url(site, veg_type, roi_id), timeout=timeout)
+	return io.StringIO(text)
+
+
+def fetch_ndvi_3day_for_roi(roi: dict, timeout: float = 30.0) -> io.StringIO:
+	"""Download the NDVI 3-day summary for a resolved ROI record.
+
+	Raises if the ROI has no infrared/NDVI product (ir_flag is false).
+	"""
+	if not roi.get("ir_flag", False):
+		raise ValueError(f"ROI {roi['roi_name']} has no IR/NDVI data (ir_flag is false)")
+	text = fetch_csv_text(roi_ndvi_3day_url(roi), timeout=timeout)
+	return io.StringIO(text)

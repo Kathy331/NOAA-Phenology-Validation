@@ -1,6 +1,6 @@
-import pandas as pd
 from pathlib import Path
 
+from data_io import load_timeseries, pick_year
 from plotting import create_plot, is_interactive_backend, save_plot, show_plots
 
 DIR = Path(__file__).parent
@@ -24,26 +24,6 @@ def find_timeseries_files(data_dir: Path) -> list[tuple[str, Path]]:
 			raise ValueError(f"Expected one *_ndvi_3day.csv in {folder}, found: {names}")
 		datasets.append((folder.name, csv_files[0]))
 	return datasets
-
-
-def load_timeseries(path: Path) -> pd.DataFrame:
-	df = pd.read_csv(path, comment="#")
-	df["date"] = pd.to_datetime(df["date"], errors="coerce")
-	df["doy"] = pd.to_numeric(df["doy"], errors="coerce")
-	df["year"] = pd.to_numeric(df["year"], errors="coerce")
-	df["gcc_90"] = pd.to_numeric(df["gcc_90"], errors="coerce")
-	df["ndvi_90"] = pd.to_numeric(df["ndvi_90"], errors="coerce")
-	return df.dropna(subset=["date", "doy", "year", "gcc_90", "ndvi_90"]).sort_values("date")
-
-
-def pick_year(timeseries: pd.DataFrame, preferred: int) -> int:
-	years = sorted(int(y) for y in timeseries["year"].dropna().unique())
-	if not years:
-		raise ValueError("No valid years in timeseries")
-	if preferred in years:
-		return preferred
-	print(f"  note: no data for {preferred}, using {years[-1]} (available: {years})")
-	return years[-1]
 
 
 def main() -> None:
