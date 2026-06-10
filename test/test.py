@@ -1,6 +1,7 @@
 from pathlib import Path
 
-from data_io import load_timeseries, pick_year
+import pandas as pd
+
 from plotting import create_plot, is_interactive_backend, save_plot, show_plots
 
 DIR = Path(__file__).parent
@@ -8,6 +9,32 @@ DATA_DIR = DIR / "data"
 OUTPUT_DIR = DIR / "output"
 
 YEAR = 2024  # preferred year, uses latest year in file if this year is missing
+
+NUMERIC_COLUMNS = ("doy", "year", "gcc_90", "ndvi_90")
+REQUIRED_COLUMNS = ("date", *NUMERIC_COLUMNS)
+
+
+def load_timeseries(source) -> pd.DataFrame:
+	"""Read a PhenoCam summary CSV into a cleaned, date-sorted DataFrame.
+
+	`source` is a path or a file-like object (e.g. io.StringIO of downloaded text).
+	"""
+	df = pd.read_csv(source, comment="#")
+	df["date"] = pd.to_datetime(df["date"], errors="coerce")
+	for column in NUMERIC_COLUMNS:
+		df[column] = pd.to_numeric(df[column], errors="coerce")
+	return df.dropna(subset=list(REQUIRED_COLUMNS)).sort_values("date")
+
+
+def pick_year(timeseries: pd.DataFrame, preferred: int) -> int:
+	"""Return the preferred year if present, else the latest available year."""
+	years = sorted(int(y) for y in timeseries["year"].dropna().unique())
+	if not years:
+		raise ValueError("No valid years in timeseries")
+	if preferred in years:
+		return preferred
+	print(f"  note: no data for {preferred}, using {years[-1]} (available: {years})")
+	return years[-1]
 
 
 def find_timeseries_files(data_dir: Path) -> list[tuple[str, Path]]:

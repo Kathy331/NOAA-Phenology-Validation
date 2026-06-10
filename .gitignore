@@ -1,6 +1,10 @@
-test/__pycache__/
+__pycache__/
 .venv/
-test/api/__pycache__/
+
+#this is where the api plots are saved, ignore generated plots
+src/output/api/*
+!src/output/api/.gitkeep
+
 
 #personal notes
 local_notes/

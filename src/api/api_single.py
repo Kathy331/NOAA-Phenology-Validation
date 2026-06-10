@@ -1,19 +1,26 @@
-"""Reproduce the ex1 figure, but sourced live from the PhenoCam API + archive.
+"""Run the PhenoCam API pipeline for a single site.
 
-Only the site name is hardcoded; the vegetation type, ROI sequence number, NDVI
-availability, and file URL are all resolved from the /api/roilists/ metadata.
-The downloaded series runs through the same loader, phase detection, and plotting
-code as the local pipeline, and is saved as output/api/API_data_<site>.png.
+Only the site name is hardcoded for now! 
+the vegetation type, ROI sequence number, NDVI availability, and file URL 
+are all from the /api/roilists/ metadata.
+
+The series will runs through phase detection, 
+and plotting, and is saved as src/output/api/API_data_<site>.png.
 """
 
 import sys
 from pathlib import Path
 
-# Shared modules (data_io, plotting, PhenoloDates) live in the parent test/ dir.
+#(plotting, PhenoloDates) live in the parent src/ dir
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-from data_io import load_timeseries, pick_year  # noqa: E402
-from phenocam_api import fetch_ndvi_3day_for_roi, find_roi, roi_ndvi_3day_url  # noqa: E402
+from phenocam_api import (  # noqa: E402
+	fetch_ndvi_3day_for_roi,
+	find_roi,
+	load_timeseries,
+	pick_year,
+	roi_ndvi_3day_url,
+)
 from plotting import create_plot, save_plot  # noqa: E402
 
 SITE = "aafcottawacfiaf14n"  # same site as test/data/ex1

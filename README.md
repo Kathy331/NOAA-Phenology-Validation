@@ -14,7 +14,14 @@ pip install -r requirements.txt
 source .venv/bin/activate
 ```
 
-## Run plots
+## Project layout
+
+- `test/` — loads CSVs from `test/data/ex--/`, runs phase detection and plots
+  (`plotting.py`). Outputs go to `test/output/`.
+- `src/` — API pipeline. `api/phenocam_api.py` fetches PhenoCam data
+  `api/api_single.py` (single site) and `api/api_batch.py` (first N ROIs)
+
+## Run plots part 1 (local files)
 ```bash
 cd test
 python3 test.py
@@ -25,6 +32,13 @@ The script rn loops over every `test/data/ex--/` folder that contains one `*_ndv
 - `test/output/ex1.png`
 - `test/output/ex2.png`
 - ....
+
+## Run plots part 2 (live from the PhenoCam API)
+```bash
+cd src/api
+python3 api_single.py   # single site -> src/output/api/API_data_<site>.png
+python3 api_batch.py    # first N ROIs -> src/output/api/API_data_<roi>.png
+```
 
 ## IMPORTANT NOTES
 

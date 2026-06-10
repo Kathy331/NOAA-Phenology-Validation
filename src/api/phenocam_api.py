@@ -1,4 +1,4 @@
-"""Fetch PhenoCam metadata and summary time series from the public API/archive.
+"""Fetch and load PhenoCam metadata and summary time series from the public API/archive.
 
 The PhenoCam REST API (https://phenocam.nau.edu/api/) exposes metadata such as
 the ROI list (/api/roilists/). The actual 3-day summary CSVs are served as static
@@ -7,19 +7,48 @@ files under the data archive:
     https://phenocam.nau.edu/data/archive/{site}/ROI/{site}_{veg}_{roi}_ndvi_3day.csv
 
 Typical use: resolve a site name to its ROI metadata with find_roi(), then download
-the NDVI series with fetch_ndvi_3day_for_roi(). The returned text buffer is read by
-data_io.load_timeseries exactly like a local CSV.
+the NDVI series with fetch_ndvi_3day_for_roi(), and parse it with load_timeseries().
+The same loader accepts a local path or an in-memory buffer, so downloaded CSVs are
+handled exactly like on-disk ones.
 """
 
 import io
 import json
 import urllib.request
 
+import pandas as pd
+
 API_BASE = "https://phenocam.nau.edu/api"
 ARCHIVE_BASE = "https://phenocam.nau.edu/data/archive"
 # The roilists endpoint has no server-side filtering, so we request every record
 # in a single page and filter client-side.
 ROILIST_PAGE_SIZE = 2000
+
+NUMERIC_COLUMNS = ("doy", "year", "gcc_90", "ndvi_90")
+REQUIRED_COLUMNS = ("date", *NUMERIC_COLUMNS)
+
+
+def load_timeseries(source) -> pd.DataFrame:
+	"""Read a PhenoCam summary CSV into a cleaned, date-sorted DataFrame.
+
+	`source` is a path or a file-like object (e.g. io.StringIO of downloaded text).
+	"""
+	df = pd.read_csv(source, comment="#")
+	df["date"] = pd.to_datetime(df["date"], errors="coerce")
+	for column in NUMERIC_COLUMNS:
+		df[column] = pd.to_numeric(df[column], errors="coerce")
+	return df.dropna(subset=list(REQUIRED_COLUMNS)).sort_values("date")
+
+
+def pick_year(timeseries: pd.DataFrame, preferred: int) -> int:
+	"""Return the preferred year if present, else the latest available year."""
+	years = sorted(int(y) for y in timeseries["year"].dropna().unique())
+	if not years:
+		raise ValueError("No valid years in timeseries")
+	if preferred in years:
+		return preferred
+	print(f"  note: no data for {preferred}, using {years[-1]} (available: {years})")
+	return years[-1]
 
 
 def fetch_json(url: str, timeout: float = 30.0) -> dict:

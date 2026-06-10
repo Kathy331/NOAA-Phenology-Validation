@@ -1,19 +1,26 @@
 """Batch-run the first N PhenoCam ROIs straight from the API.
 
 Pulls the ROI list from /api/roilists/, takes the first N records, and for each
-one downloads the NDVI 3-day series, runs CCRmax phase detection, and saves a
-figure as output/api/API_data_<roi_name>.png. Failures (missing file, too little
-data, etc.) are reported per ROI without stopping the batch.
+one downloads the NDVI 3 day series, runs CCRmax phase detection, and saves a
+figure as src/output/api/API_data_<roi_name>.png. 
+
+Failures (missing file, too little data, etc) 
+are reported without stopping the batch.
 """
 
 import sys
 from pathlib import Path
 
-# Shared modules (data_io, plotting, PhenoloDates) live in the parent test/ dir.
+#(plotting, PhenoloDates) live in the parent src/ dir
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-from data_io import load_timeseries, pick_year  # noqa: E402
-from phenocam_api import fetch_ndvi_3day_for_roi, list_rois, roi_ndvi_3day_url  # noqa: E402
+from phenocam_api import (  # noqa: E402
+	fetch_ndvi_3day_for_roi,
+	list_rois,
+	load_timeseries,
+	pick_year,
+	roi_ndvi_3day_url,
+)
 from plotting import create_plot, save_plot  # noqa: E402
 
 N_SITES = 10
