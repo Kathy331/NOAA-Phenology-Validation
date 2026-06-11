@@ -11,7 +11,7 @@ are reported without stopping the batch.
 import sys
 from pathlib import Path
 
-#(plotting, PhenoloDates) live in the parent src/ dir
+#(plotting, PhenoloDates files)
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from phenocam_api import (  # noqa: E402
