@@ -14,6 +14,7 @@ from pathlib import Path
 #(plotting, PhenoloDates files)
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
+from DynamicTimeWrap import site_agreement_score 
 from phenocam_api import (  # noqa: E402
 	fetch_ndvi_3day_for_roi,
 	list_rois,
@@ -21,7 +22,7 @@ from phenocam_api import (  # noqa: E402
 	pick_year,
 	roi_ndvi_3day_url,
 )
-from plotting import create_plot, save_plot  # noqa: E402
+from plotting import create_plot, save_plot  
 
 N_SITES = 10
 YEAR = 2024  # preferred year, uses latest year in file if this year is missing
@@ -36,7 +37,8 @@ def process_roi(roi: dict):
 	title = f"API: PhenoCam Time Series for GCC_90 and NDVI_90 ({roi['roi_name']}, {year})"
 	output_file = OUTPUT_DIR / f"API_data_{roi['roi_name']}.png"
 
-	fig, gcc_phases, ndvi_phases = create_plot(timeseries, year, title)
+	scores = site_agreement_score(timeseries, year)
+	fig, gcc_phases, ndvi_phases = create_plot(timeseries, year, title, scores=scores)
 	save_plot(fig, output_file)
 	return year, output_file, gcc_phases, ndvi_phases
 

@@ -14,6 +14,7 @@ from pathlib import Path
 #(plotting, PhenoloDates files)
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
+from DynamicTimeWrap import site_agreement_score  # noqa: E402
 from phenocam_api import (  # noqa: E402
 	fetch_ndvi_3day_for_roi,
 	find_roi,
@@ -41,7 +42,8 @@ def main() -> None:
 	output_file = OUTPUT_DIR / f"API_data_{SITE}.png"
 
 	OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
-	fig, gcc_phases, ndvi_phases = create_plot(timeseries, year, title)
+	scores = site_agreement_score(timeseries, year)
+	fig, gcc_phases, ndvi_phases = create_plot(timeseries, year, title, scores=scores)
 	save_plot(fig, output_file)
 
 	print(f"Saved {output_file}")

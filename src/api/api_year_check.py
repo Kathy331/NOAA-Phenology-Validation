@@ -25,7 +25,7 @@ from phenocam_api import (  # noqa: E402
 )
 
 TARGET_YEARS = (2023, 2024)
-MAX_WORKERS = 20  # tune this -- more = faster up to a point, but be respectful to the API
+MAX_WORKERS = 20 
 
 OUTPUT_JSON = Path(__file__).resolve().parent.parent / "output" / "api" / "year_check.json"
 
