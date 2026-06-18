@@ -17,7 +17,7 @@ from pathlib import Path
 #(plotting, PhenoloDates files)
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-from phenocam_api import (  # noqa: E402
+from phenocam_api import (  
 	fetch_ndvi_3day_for_roi,
 	list_rois,
 	load_timeseries,
