@@ -39,6 +39,7 @@ OUTPUT_DIR = Path(__file__).resolve().parent.parent / "output" / "api"
 YEAR_CHECK_JSON = OUTPUT_DIR / "year_check.json"
 SITE_METADATA_JSON = OUTPUT_DIR / "site_metadata.json"
 SITE_METADATA_CLEAN_JSON = OUTPUT_DIR / "site_metadata_clean.json"
+SITE_GEE_CLEAN_JSON = OUTPUT_DIR / "site_GEE_clean.json"
 
 
 # Each year_check bucket and the year(s) to score its sites for.
@@ -170,6 +171,39 @@ def clean_site_metadata(
 	return cleaned
 
 
+def build_gee_clean(
+	data: dict | str | Path, output_path: Path = SITE_GEE_CLEAN_JSON
+) -> dict:
+	"""Strip metadata down to name/lat/lon plus metadata.year, then save for GEE.
+
+	`data` may be the dict returned by clean_site_metadata or a path to a
+	site_metadata_clean.json file.
+	"""
+	if isinstance(data, (str, Path)):
+		data = json.loads(Path(data).read_text())
+
+	stripped: dict = {}
+	for group, group_data in data.items():
+		sites = [
+			{
+				"name": site["name"],
+				"lat": site["lat"],
+				"lon": site["lon"],
+				"metadata": {"year": site["metadata"]["year"]},
+			}
+			for site in group_data["sites"]
+		]
+		stripped[group] = {"count": len(sites), "sites": sites}
+
+	output_path.parent.mkdir(parents=True, exist_ok=True)
+	output_path.write_text(json.dumps(stripped, indent=2) + "\n")
+
+	total = sum(group_data["count"] for group_data in stripped.values())
+	print(f"GEE-clean: kept {total} sites (name/lat/lon only).")
+	print(f"Saved GEE-clean sites to {output_path}")
+	return stripped
+
+
 def resolve_roi(name: str, rois: list[dict] | None = None) -> dict:
 	"""Resolve a roi_name (e.g. site_EN_1001) or bare site name to its ROI record."""
 	rois = rois if rois is not None else list_rois()
@@ -208,9 +242,10 @@ def plot_site(name: str, year: int, output_dir: Path = OUTPUT_DIR) -> Path:
 
 
 def main() -> None:
-	metadata = build_site_metadata(YEAR_CHECK_JSON)
-	clean_site_metadata(metadata)
-	# plot_site("NEON.D05.STEI.DP1.00033_DB_1000", 2023)
+	# metadata = build_site_metadata(YEAR_CHECK_JSON)
+	# cleaned = clean_site_metadata(metadata)
+	# build_gee_clean(cleaned)
+	plot_site("NEON.D08.TOMB.DP1.20002_DB_2000", 2023)
 
 
 if __name__ == "__main__":
