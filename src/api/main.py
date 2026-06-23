@@ -40,6 +40,7 @@ YEAR_CHECK_JSON = OUTPUT_DIR / "year_check.json"
 SITE_METADATA_JSON = OUTPUT_DIR / "site_metadata.json"
 SITE_METADATA_CLEAN_JSON = OUTPUT_DIR / "site_metadata_clean.json"
 SITE_GEE_CLEAN_JSON = OUTPUT_DIR / "site_GEE_clean.json"
+SITE_TOP_JSON = OUTPUT_DIR / "site_top.json"
 
 
 # Each year_check bucket and the year(s) to score its sites for.
@@ -48,6 +49,9 @@ GROUP_YEARS: dict[str, tuple[int, ...]] = {
 	"has_2024_only": (2024,),
 	"has_both_2023_and_2024": (2023, 2024),
 }
+
+# Metrics that top_sites can rank by / threshold on.
+RANK_METRICS = ("divergence_score", "dtw_per_step", "phenophase_gap_days")
 
 
 def run_threaded(func: Callable, items: Iterable, max_workers: int = MAX_WORKERS) -> list:
@@ -171,6 +175,24 @@ def clean_site_metadata(
 	return cleaned
 
 
+def save_site_data(data: dict | str | Path, output_path: Path = SITE_TOP_JSON) -> dict:
+	"""Write grouped site data to JSON keeping all metadata fields intact.
+
+	`data` may be a dict (e.g. from top_sites) or a path to a json file. Unlike
+	build_gee_clean, this keeps the full metadata (year, phenophase_gap_days,
+	dtw_per_step, divergence_score).
+	"""
+	if isinstance(data, (str, Path)):
+		data = json.loads(Path(data).read_text())
+
+	output_path.parent.mkdir(parents=True, exist_ok=True)
+	output_path.write_text(json.dumps(data, indent=2) + "\n")
+
+	total = sum(len(group_data["sites"]) for group_data in data.values())
+	print(f"Saved {total} entries (full metadata) to {output_path}")
+	return data
+
+
 def build_gee_clean(
 	data: dict | str | Path, output_path: Path = SITE_GEE_CLEAN_JSON
 ) -> dict:
@@ -202,6 +224,60 @@ def build_gee_clean(
 	print(f"GEE-clean: kept {total} sites (name/lat/lon only).")
 	print(f"Saved GEE-clean sites to {output_path}")
 	return stripped
+
+
+def top_sites(
+	data: dict | str | Path,
+	n: int = 10,
+	sort_by: str = "divergence_score",
+	max_divergence_score: float | None = None,
+	max_dtw_per_step: float | None = None,
+	max_phenophase_gap_days: float | None = None,
+	output_path: Path | None = None,
+) -> dict:
+	"""Return the N site entries with the lowest `sort_by` metric.
+
+	`data` may be the dict from clean_site_metadata or a path to a
+	site_metadata_clean.json file. `sort_by` is one of RANK_METRICS. The optional
+	max_* arguments keep only entries whose metric is at or below the given cap.
+
+	The result keeps the site_metadata structure (a single ranked group), so it
+	can be passed straight to build_gee_clean. If output_path is given, it is also
+	saved there.
+	"""
+	if sort_by not in RANK_METRICS:
+		raise ValueError(f"sort_by must be one of {RANK_METRICS}, got {sort_by!r}")
+
+	if isinstance(data, (str, Path)):
+		data = json.loads(Path(data).read_text())
+
+	entries = [site for group_data in data.values() for site in group_data["sites"]]
+
+	caps = {
+		"divergence_score": max_divergence_score,
+		"dtw_per_step": max_dtw_per_step,
+		"phenophase_gap_days": max_phenophase_gap_days,
+	}
+	for metric, cap in caps.items():
+		if cap is not None:
+			entries = [
+				e for e in entries
+				if e["metadata"].get(metric) is not None and e["metadata"][metric] <= cap
+			]
+
+	ranked = sorted(
+		(e for e in entries if e["metadata"].get(sort_by) is not None),
+		key=lambda e: e["metadata"][sort_by],
+	)[:n]
+
+	result = {f"top_{n}_lowest_{sort_by}": {"count": len(ranked), "sites": ranked}}
+
+	if output_path is not None:
+		output_path.parent.mkdir(parents=True, exist_ok=True)
+		output_path.write_text(json.dumps(result, indent=2) + "\n")
+		print(f"Saved top {len(ranked)} sites by {sort_by} to {output_path}")
+
+	return result
 
 
 def resolve_roi(name: str, rois: list[dict] | None = None) -> dict:
@@ -244,8 +320,16 @@ def plot_site(name: str, year: int, output_dir: Path = OUTPUT_DIR) -> Path:
 def main() -> None:
 	# metadata = build_site_metadata(YEAR_CHECK_JSON)
 	# cleaned = clean_site_metadata(metadata)
-	# build_gee_clean(cleaned)
-	plot_site("NEON.D08.TOMB.DP1.20002_DB_2000", 2023)
+	# top_gee_clean = top_sites(cleaned, n=40, sort_by="divergence_score", max_divergence_score=0.1)
+	# build_gee_clean(top_gee_clean)
+	# plot_site("NEON.D08.TOMB.DP1.20002_DB_2000", 2023)
+
+	top = top_sites(
+		SITE_METADATA_CLEAN_JSON, n=40, sort_by="divergence_score", max_divergence_score=0.5
+	)
+	save_site_data(top)
+
+	build_gee_clean(top)
 
 
 if __name__ == "__main__":
