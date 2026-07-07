@@ -8,3 +8,5 @@ src/output/api/*
 
 #personal notes
 local_notes/
+
+.env

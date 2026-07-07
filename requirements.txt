@@ -2,3 +2,6 @@ pandas
 numpy
 matplotlib
 scipy
+earthengine-api
+geemap
+python-dotenv

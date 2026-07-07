@@ -1,3 +1,5 @@
+
+//THIS IS FOR GOOGLE EARTH ENGINE SCRIPT
 var SITE_NAMES = [
     'goodwater_AG_1000'
   ];
