@@ -1,0 +1,55 @@
+{
+  "counts": {
+    "evaluated": 21,
+    "step1_passed": 2,
+    "step2_scored": 2,
+    "missing_latlon": 0
+  },
+  "thresholds": {
+    "cv_max": 0.1,
+    "water_max": 0.05,
+    "urban_max": 0.05
+  },
+  "sites": [
+    {
+      "name": "NEON.D01.HARV.DP1.00033_DB_1000",
+      "lat": 42.536911,
+      "lon": -72.17265,
+      "year": 2024,
+      "spatial": {
+        "cv_ndvi": 0.0756,
+        "water_pct": 0.0,
+        "urban_pct": 0.0029,
+        "summer_doy": 196,
+        "n_images": 2
+      },
+      "phenology": {
+        "year": 2024,
+        "phenophase_gap_days": 12.5,
+        "dtw_per_step": 0.0364,
+        "divergence_score": 0.9292
+      },
+      "status": "ok"
+    },
+    {
+      "name": "NEON.D08.TALL.DP1.00033_EN_1000",
+      "lat": 32.95047,
+      "lon": -87.393259,
+      "year": 2023,
+      "spatial": {
+        "cv_ndvi": 0.0829,
+        "water_pct": 0.0,
+        "urban_pct": 0.0033,
+        "summer_doy": 248,
+        "n_images": 2
+      },
+      "phenology": {
+        "year": 2023,
+        "phenophase_gap_days": 19.5,
+        "dtw_per_step": 0.0838,
+        "divergence_score": 1.4767
+      },
+      "status": "ok"
+    }
+  ]
+}

@@ -16,10 +16,13 @@ source .venv/bin/activate
 
 ## Project layout
 
-- `test/` — loads CSVs from `test/data/ex--/`, runs phase detection and plots
+- `test/` - loads CSVs from `test/data/ex--/`, runs phase detection and plots
   (`plotting.py`). Outputs go to `test/output/`.
-- `src/` — API pipeline. `api/phenocam_api.py` fetches PhenoCam data
+- `src/` - API pipeline. `api/phenocam_api.py` fetches PhenoCam data
   `api/api_single.py` (single site) and `api/api_batch.py` (first N ROIs)
+- `pipeline/` - self-contained spatial + phenology screening pipeline
+  (Earth Engine uniformity, then NDVI-vs-GCC phenology agreement). Reads the
+  pre-computed `site_metadata_clean.json`, so it makes no live PhenoCam calls.
 
 ## Run plots part 1 (local files)
 ```bash
@@ -40,7 +43,41 @@ python3 api_single.py   # single site -> src/output/api/API_data_<site>.png
 python3 api_batch.py    # first N ROIs -> src/output/api/API_data_<roi>.png
 ```
 
-## IMPORTANT NOTES
+## Run the screening pipeline (`pipeline/`)
+
+A two step screen over every site in `pipeline/input/site_metadata_clean.json` (obtain
+via 'src/' year_check.json):
+1. **Step 1 (Earth Engine):** keep sites whose peak summer NDVI is spatially uniform
+   (NDVI CV < 0.1, water < 5%, urban < 5%) inside a ~4 km box.
+2. **Step 2:** attach the pre computed NDVI vs GCC agreement scores (phenophase gap,
+   DTW/step, divergence) for the Step 1 survivors
+
+Outputs land in `pipeline/output/` (`step1_uniformity.json`, `step2_phenology.json`,
+and `pipeline_results.json` - survivors ranked by divergence)
+
+```bash
+cd pipeline
+python3 run_pipeline.py     # run ALL site years (default)
+```
+
+### `PIPELINE_LIMIT` (optional test cap)
+
+`PIPELINE_LIMIT` is an optional environment variable that caps how many site-years
+are processed - useful for a quick test without waiting on the full run. It is
+**not set by default**, so a plain `python3 run_pipeline.py` already processes every
+site in `site_metadata_clean.json`.
+
+```bash
+PIPELINE_LIMIT=8 python3 run_pipeline.py   # only the first 8 site years
+python3 run_pipeline.py                     # no limit -> all site years
+```
+
+Notes:
+- Requires a one-time Earth Engine `localhost` auth and `EE_PROJECT` set in `.env`.
+- A full run makes several Earth Engine calls per site, so it is network-bound and
+  can take a while; tune `STEP1_WORKERS` and thresholds in `pipeline/config.py`.
+
+## IMPORTANT NOTES: TESTING
 
 Set the preferred year at the top of `test/test.py` (`YEAR = 2024`).
 

@@ -2,19 +2,25 @@
 
   - build_site_metadata(): reads year_check.json, and for each site fetches its
     lat/lon and NDVI-vs-GCC scores (phenophase gap, DTW/step, divergence score),
-    then saves them grouped by year bucket to site_metadata.json.
+    plus the four phenophase dates (SOS/MOS/DOS/EOS) for each of the NDVI and GCC
+    curves, then saves them grouped by year bucket to site_metadata.json.
   - clean_site_metadata(): drops any site entry that has a null score and saves
     the result to site_metadata_clean.json.
+  - build_gbov_metadata(): same scoring but only for the NEON/GBOV sites listed in
+    doc/PhenoCam GBOV sites.xlsx, saved (clean style) to site_GBOV_clean.json.
   - plot_site(name, year): saves one site's NDVI/GCC time series plot.
 
 Run with:  python3 src/api/main.py
 """
 
 import json
+import math
 import sys
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from collections.abc import Callable, Iterable
 from pathlib import Path
+
+import pandas as pd
 
 # src on the path so functions here can reach PhenoloDates / plotting too.
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
@@ -24,6 +30,7 @@ from DynamicTimeWrap import (
 	_jsonable,
 	site_agreement_score,
 )
+from PhenoloDates import compute_phases
 from phenocam_api import ( 
 	fetch_ndvi_3day_for_roi,
 	find_roi,
@@ -41,6 +48,10 @@ SITE_METADATA_JSON = OUTPUT_DIR / "site_metadata.json"
 SITE_METADATA_CLEAN_JSON = OUTPUT_DIR / "site_metadata_clean.json"
 SITE_GEE_CLEAN_JSON = OUTPUT_DIR / "site_GEE_clean.json"
 SITE_TOP_JSON = OUTPUT_DIR / "site_top.json"
+SITE_GBOV_CLEAN_JSON = OUTPUT_DIR / "site_GBOV_clean.json"
+
+# Mentor-supplied NEON/GBOV validation sites (Site name + ROI Subset + year X marks).
+GBOV_XLSX = Path(__file__).resolve().parent.parent.parent / "doc" / "PhenoCam GBOV sites.xlsx"
 
 
 # Each year_check bucket and the year(s) to score its sites for.
@@ -91,6 +102,27 @@ def build_tasks(
 	return tasks, missing
 
 
+def _clean_phases(phases: dict[str, float]) -> dict[str, float | None]:
+	"""Round DOY phase values and turn not finite ones into null."""
+	return {
+		phase: (round(float(doy), 2) if doy is not None and math.isfinite(doy) else None)
+		for phase, doy in phases.items()
+	}
+
+
+def phenophase_dates(timeseries, year: int) -> dict[str, dict[str, float | None]]:
+	"""SOS/MOS/DOS/EOS (DOY) for both the NDVI and GCC curves for one year.
+
+	Stored under a site's metadata as {"ndvi": {...}, "gcc": {...}} so both
+	curves' four dates sit together; any phase that could not be fit is null.
+	"""
+	year_df = timeseries.loc[timeseries["year"] == year]
+	return {
+		"ndvi": _clean_phases(compute_phases(year_df["doy"].values, year_df["ndvi_90"].values)),
+		"gcc": _clean_phases(compute_phases(year_df["doy"].values, year_df["gcc_90"].values)),
+	}
+
+
 def score_task(task: tuple) -> tuple[str, list[dict], str | None]:
 	"""Fetch one site once and build a metadata entry per requested year."""
 	group, name, roi, years = task
@@ -101,12 +133,14 @@ def score_task(task: tuple) -> tuple[str, list[dict], str | None]:
 
 	entries = []
 	for year in years:
+		metadata = _jsonable(site_agreement_score(timeseries, year))
+		metadata["phenophases"] = phenophase_dates(timeseries, year)
 		entries.append(
 			{
 				"name": name,
 				"lat": roi.get("lat"),
 				"lon": roi.get("lon"),
-				"metadata": _jsonable(site_agreement_score(timeseries, year)),
+				"metadata": metadata,
 			}
 		)
 	return (group, entries, None)
@@ -146,11 +180,13 @@ def build_site_metadata(year_check_json: Path = YEAR_CHECK_JSON) -> dict:
 def clean_site_metadata(
 	data: dict | str | Path, output_path: Path = SITE_METADATA_CLEAN_JSON
 ) -> dict:
-	"""Drop every site entry that has a null value in its metadata, then save.
+	"""Drop every site entry that has a null score in its metadata, then save.
 
 	`data` may be the dict returned by build_site_metadata or a path to a
-	site_metadata.json file. An entry is removed if any metadata value is null
-	(e.g. a missing phenophase gap or divergence score).
+	site_metadata.json file. An entry is removed if any of its scalar scores is
+	null (e.g. a missing phenophase gap or divergence score). The nested
+	phenophases block is not null-checked, so a site is kept even if a single
+	SOS/MOS/DOS/EOS date could not be fit.
 	"""
 	if isinstance(data, (str, Path)):
 		data = json.loads(Path(data).read_text())
@@ -161,7 +197,11 @@ def clean_site_metadata(
 		kept = [
 			site
 			for site in group_data["sites"]
-			if all(value is not None for value in site["metadata"].values())
+			if all(
+				value is not None
+				for value in site["metadata"].values()
+				if not isinstance(value, dict)
+			)
 		]
 		removed += len(group_data["sites"]) - len(kept)
 		cleaned[group] = {"count": len(kept), "sites": kept}
@@ -173,6 +213,81 @@ def clean_site_metadata(
 	print(f"Cleaned metadata: kept {total} entries, removed {removed} with nulls.")
 	print(f"Saved cleaned metadata to {output_path}")
 	return cleaned
+
+
+def _year_bucket(years: tuple[int, ...]) -> str:
+	"""Map the requested year(s) to the matching GROUP_YEARS bucket."""
+	if 2023 in years and 2024 in years:
+		return "has_both_2023_and_2024"
+	if 2023 in years:
+		return "has_2023_only"
+	return "has_2024_only"
+
+
+def load_gbov_tasks(
+	xlsx_path: Path, rois_by_name: dict[str, dict]
+) -> tuple[list[tuple], list[str]]:
+	"""Read the GBOV spreadsheet into score_task tuples (group, name, roi, years).
+
+	Each row gives a Site name, an ROI Subset (e.g. DB_1000), and an 'X' under
+	2023 and/or 2024 for the years to fetch. Rows without a site/subset (note-only
+	rows) are skipped. Returns (tasks, missing) where missing lists ROI names with
+	no PhenoCam metadata.
+	"""
+	df = pd.read_excel(xlsx_path)
+	tasks: list[tuple] = []
+	missing: list[str] = []
+	for _, row in df.iterrows():
+		name_cell, subset = row.get("Site name"), row.get("Subset")
+		if pd.isna(name_cell) or pd.isna(subset):
+			continue
+		# Cells can carry stray whitespace/newlines; normalize before matching.
+		roi_name = f"{str(name_cell).strip()}_{str(subset).strip()}"
+		years = tuple(y for y in (2023, 2024) if str(row.get(y)).strip() == "X")
+		if not years:
+			continue
+		roi = rois_by_name.get(roi_name)
+		if roi is None:
+			missing.append(roi_name)
+			continue
+		tasks.append((_year_bucket(years), roi_name, roi, years))
+	return tasks, missing
+
+
+def build_gbov_metadata(
+	xlsx_path: Path = GBOV_XLSX, output_path: Path = SITE_GBOV_CLEAN_JSON
+) -> dict:
+	"""Score just the GBOV spreadsheet sites and save them in the clean-JSON style.
+
+	Fetches PhenoCam NDVI/GCC for each Site name + ROI Subset and requested year,
+	computes the same metadata as build_site_metadata (phenophase gap, DTW/step,
+	divergence, plus the NDVI/GCC phase dates), groups by year bucket, and drops
+	null-score entries -- identical structure to site_metadata_clean.json.
+	"""
+	rois_by_name = {roi["roi_name"]: roi for roi in list_rois()}
+	tasks, missing = load_gbov_tasks(xlsx_path, rois_by_name)
+	print(f"GBOV: scoring {len(tasks)} ROIs from {xlsx_path.name} ({len(missing)} missing metadata)...")
+	if missing:
+		print(f"  missing ROIs: {missing}")
+
+	grouped: dict[str, list[dict]] = {group: [] for group in GROUP_YEARS}
+	failed = 0
+	for group, entries, error in run_threaded(score_task, tasks):
+		if error:
+			failed += 1
+			continue
+		grouped[group].extend(entries)
+
+	results: dict = {}
+	for group in GROUP_YEARS:
+		sites = sorted(grouped[group], key=lambda e: (e["name"], e["metadata"]["year"]))
+		results[group] = {"count": len(sites), "sites": sites}
+
+	scored = sum(results[group]["count"] for group in GROUP_YEARS)
+	print(f"GBOV: scored {scored} site-years ({failed} failed).")
+
+	# Drop null-score entries so the file matches the site_metadata_clean style.
+	return clean_site_metadata(results, output_path=output_path)
 
 
 def save_site_data(data: dict | str | Path, output_path: Path = SITE_TOP_JSON) -> dict:
@@ -318,18 +433,21 @@ def plot_site(name: str, year: int, output_dir: Path = OUTPUT_DIR) -> Path:
 
 
 def main() -> None:
+	build_gbov_metadata()
+
+	# Full pipeline (uncomment to rebuild everything from year_check.json). This
+	# scores every site-year, including SOS/MOS/DOS/EOS for NDVI and GCC, then
+	# drops entries with null scores.
 	# metadata = build_site_metadata(YEAR_CHECK_JSON)
-	# cleaned = clean_site_metadata(metadata)
-	# top_gee_clean = top_sites(cleaned, n=40, sort_by="divergence_score", max_divergence_score=0.1)
-	# build_gee_clean(top_gee_clean)
+	# clean_site_metadata(metadata)
+
+	# top = top_sites(SITE_METADATA_CLEAN_JSON, n=40, sort_by="divergence_score", max_divergence_score=0.5)
+	# save_site_data(top)
+	# build_gee_clean(top)
 	# plot_site("NEON.D08.TOMB.DP1.20002_DB_2000", 2023)
 
-	top = top_sites(
-		SITE_METADATA_CLEAN_JSON, n=40, sort_by="divergence_score", max_divergence_score=0.5
-	)
-	save_site_data(top)
-
-	build_gee_clean(top)
+	# show the plot for 'NEON.D10.STER.DP1.00033'
+	plot_site("NEON.D10.STER.DP1.00033", 2023)
 
 
 if __name__ == "__main__":

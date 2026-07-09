@@ -1,0 +1,775 @@
+{
+  "counts": {
+    "evaluated": 1281,
+    "step1_passed": 38,
+    "step2_scored": 38,
+    "missing_latlon": 0
+  },
+  "thresholds": {
+    "cv_max": 0.1,
+    "water_max": 0.05,
+    "urban_max": 0.05
+  },
+  "sites": [
+    {
+      "name": "alercecosteroforest_EN_1001",
+      "lat": -40.1726,
+      "lon": -73.4439,
+      "year": 2023,
+      "spatial": {
+        "cv_ndvi": 0.0624,
+        "water_pct": 0.0001,
+        "urban_pct": 0.0002,
+        "summer_doy": 221,
+        "n_images": 1
+      },
+      "phenology": {
+        "year": 2023,
+        "phenophase_gap_days": 0.0,
+        "dtw_per_step": 0.1708,
+        "divergence_score": 0.1708
+      },
+      "status": "ok"
+    },
+    {
+      "name": "congoflux_EB_1000",
+      "lat": 0.8144,
+      "lon": 24.5024,
+      "year": 2023,
+      "spatial": {
+        "cv_ndvi": 0.0827,
+        "water_pct": 0.0,
+        "urban_pct": 0.0219,
+        "summer_doy": 317,
+        "n_images": 4
+      },
+      "phenology": {
+        "year": 2023,
+        "phenophase_gap_days": 3.0,
+        "dtw_per_step": 0.0804,
+        "divergence_score": 0.2947
+      },
+      "status": "ok"
+    },
+    {
+      "name": "NEON.D07.GRSM.DP1.00033_DB_1000",
+      "lat": 35.68896,
+      "lon": -83.50195,
+      "year": 2023,
+      "spatial": {
+        "cv_ndvi": 0.0946,
+        "water_pct": 0.0004,
+        "urban_pct": 0.007,
+        "summer_doy": 196,
+        "n_images": 1
+      },
+      "phenology": {
+        "year": 2023,
+        "phenophase_gap_days": 7.0,
+        "dtw_per_step": 0.019,
+        "divergence_score": 0.519
+      },
+      "status": "ok"
+    },
+    {
+      "name": "arsltarucbec1_AG_1000",
+      "lat": 40.7537,
+      "lon": -78.0057,
+      "year": 2023,
+      "spatial": {
+        "cv_ndvi": 0.0995,
+        "water_pct": 0.0003,
+        "urban_pct": 0.0092,
+        "summer_doy": 232,
+        "n_images": 4
+      },
+      "phenology": {
+        "year": 2023,
+        "phenophase_gap_days": 7.0,
+        "dtw_per_step": 0.0348,
+        "divergence_score": 0.5348
+      },
+      "status": "ok"
+    },
+    {
+      "name": "harvardfarmnorth_AG_1000",
+      "lat": 42.520465,
+      "lon": -72.182242,
+      "year": 2023,
+      "spatial": {
+        "cv_ndvi": 0.0978,
+        "water_pct": 0.0,
+        "urban_pct": 0.0076,
+        "summer_doy": 132,
+        "n_images": 2
+      },
+      "phenology": {
+        "year": 2023,
+        "phenophase_gap_days": 9.75,
+        "dtw_per_step": 0.0465,
+        "divergence_score": 0.7429
+      },
+      "status": "ok"
+    },
+    {
+      "name": "NEON.D07.MLBS.DP1.00042_UN_1000",
+      "lat": 37.378314,
+      "lon": -80.524847,
+      "year": 2024,
+      "spatial": {
+        "cv_ndvi": 0.0859,
+        "water_pct": 0.0001,
+        "urban_pct": 0.0008,
+        "summer_doy": 187,
+        "n_images": 2
+      },
+      "phenology": {
+        "year": 2024,
+        "phenophase_gap_days": 11.25,
+        "dtw_per_step": 0.0523,
+        "divergence_score": 0.8559
+      },
+      "status": "ok"
+    },
+    {
+      "name": "NEON.D07.GRSM.DP1.00042_UN_1000",
+      "lat": 35.68896,
+      "lon": -83.50195,
+      "year": 2023,
+      "spatial": {
+        "cv_ndvi": 0.0946,
+        "water_pct": 0.0004,
+        "urban_pct": 0.007,
+        "summer_doy": 192,
+        "n_images": 1
+      },
+      "phenology": {
+        "year": 2023,
+        "phenophase_gap_days": 12.0,
+        "dtw_per_step": 0.023,
+        "divergence_score": 0.8802
+      },
+      "status": "ok"
+    },
+    {
+      "name": "NEON.D01.HARV.DP1.00033_DB_1000",
+      "lat": 42.536911,
+      "lon": -72.17265,
+      "year": 2024,
+      "spatial": {
+        "cv_ndvi": 0.0756,
+        "water_pct": 0.0,
+        "urban_pct": 0.0029,
+        "summer_doy": 196,
+        "n_images": 2
+      },
+      "phenology": {
+        "year": 2024,
+        "phenophase_gap_days": 12.5,
+        "dtw_per_step": 0.0364,
+        "divergence_score": 0.9292
+      },
+      "status": "ok"
+    },
+    {
+      "name": "robinson2_DB_1000",
+      "lat": 37.4671,
+      "lon": -83.1576,
+      "year": 2023,
+      "spatial": {
+        "cv_ndvi": 0.0551,
+        "water_pct": 0.0003,
+        "urban_pct": 0.0009,
+        "summer_doy": 180,
+        "n_images": 3
+      },
+      "phenology": {
+        "year": 2023,
+        "phenophase_gap_days": 14.0,
+        "dtw_per_step": 0.0358,
+        "divergence_score": 1.0358
+      },
+      "status": "ok"
+    },
+    {
+      "name": "NEON.D07.MLBS.DP1.00033_DB_2000",
+      "lat": 37.378314,
+      "lon": -80.524847,
+      "year": 2024,
+      "spatial": {
+        "cv_ndvi": 0.0859,
+        "water_pct": 0.0001,
+        "urban_pct": 0.0008,
+        "summer_doy": 190,
+        "n_images": 2
+      },
+      "phenology": {
+        "year": 2024,
+        "phenophase_gap_days": 14.25,
+        "dtw_per_step": 0.0364,
+        "divergence_score": 1.0543
+      },
+      "status": "ok"
+    },
+    {
+      "name": "harvardems2_DB_1000",
+      "lat": 42.5378,
+      "lon": -72.1715,
+      "year": 2024,
+      "spatial": {
+        "cv_ndvi": 0.0732,
+        "water_pct": 0.0,
+        "urban_pct": 0.0027,
+        "summer_doy": 192,
+        "n_images": 2
+      },
+      "phenology": {
+        "year": 2024,
+        "phenophase_gap_days": 14.75,
+        "dtw_per_step": 0.055,
+        "divergence_score": 1.1086
+      },
+      "status": "ok"
+    },
+    {
+      "name": "willowcreek_DB_1000",
+      "lat": 45.805986,
+      "lon": -90.07912,
+      "year": 2023,
+      "spatial": {
+        "cv_ndvi": 0.074,
+        "water_pct": 0.0028,
+        "urban_pct": 0.0029,
+        "summer_doy": 190,
+        "n_images": 2
+      },
+      "phenology": {
+        "year": 2023,
+        "phenophase_gap_days": 15.25,
+        "dtw_per_step": 0.0814,
+        "divergence_score": 1.1707
+      },
+      "status": "ok"
+    },
+    {
+      "name": "arsltarucbec2_AG_1000",
+      "lat": 40.7558,
+      "lon": -77.9999,
+      "year": 2023,
+      "spatial": {
+        "cv_ndvi": 0.093,
+        "water_pct": 0.0003,
+        "urban_pct": 0.0089,
+        "summer_doy": 234,
+        "n_images": 4
+      },
+      "phenology": {
+        "year": 2023,
+        "phenophase_gap_days": 16.25,
+        "dtw_per_step": 0.0263,
+        "divergence_score": 1.187
+      },
+      "status": "ok"
+    },
+    {
+      "name": "NEON.D07.MLBS.DP1.00042_UN_1000",
+      "lat": 37.378314,
+      "lon": -80.524847,
+      "year": 2023,
+      "spatial": {
+        "cv_ndvi": 0.0356,
+        "water_pct": 0.0001,
+        "urban_pct": 0.0008,
+        "summer_doy": 203,
+        "n_images": 1
+      },
+      "phenology": {
+        "year": 2023,
+        "phenophase_gap_days": 15.5,
+        "dtw_per_step": 0.1231,
+        "divergence_score": 1.2302
+      },
+      "status": "ok"
+    },
+    {
+      "name": "bbc1_DB_1000",
+      "lat": 42.53508,
+      "lon": -72.174359,
+      "year": 2024,
+      "spatial": {
+        "cv_ndvi": 0.0766,
+        "water_pct": 0.0,
+        "urban_pct": 0.003,
+        "summer_doy": 190,
+        "n_images": 2
+      },
+      "phenology": {
+        "year": 2024,
+        "phenophase_gap_days": 19.25,
+        "dtw_per_step": 0.0309,
+        "divergence_score": 1.4059
+      },
+      "status": "ok"
+    },
+    {
+      "name": "NEON.D08.TALL.DP1.00033_EN_1000",
+      "lat": 32.95047,
+      "lon": -87.393259,
+      "year": 2023,
+      "spatial": {
+        "cv_ndvi": 0.0829,
+        "water_pct": 0.0,
+        "urban_pct": 0.0033,
+        "summer_doy": 248,
+        "n_images": 2
+      },
+      "phenology": {
+        "year": 2023,
+        "phenophase_gap_days": 19.5,
+        "dtw_per_step": 0.0838,
+        "divergence_score": 1.4767
+      },
+      "status": "ok"
+    },
+    {
+      "name": "NEON.D08.TALL.DP1.00033_EN_1000",
+      "lat": 32.95047,
+      "lon": -87.393259,
+      "year": 2024,
+      "spatial": {
+        "cv_ndvi": 0.0928,
+        "water_pct": 0.0,
+        "urban_pct": 0.0026,
+        "summer_doy": 212,
+        "n_images": 2
+      },
+      "phenology": {
+        "year": 2024,
+        "phenophase_gap_days": 21.25,
+        "dtw_per_step": 0.0546,
+        "divergence_score": 1.5725
+      },
+      "status": "ok"
+    },
+    {
+      "name": "laupahoehoe_EB_1000",
+      "lat": 19.9322,
+      "lon": -155.2912,
+      "year": 2023,
+      "spatial": {
+        "cv_ndvi": 0.0506,
+        "water_pct": 0.0,
+        "urban_pct": 0.0001,
+        "summer_doy": 338,
+        "n_images": 2
+      },
+      "phenology": {
+        "year": 2023,
+        "phenophase_gap_days": 21.5,
+        "dtw_per_step": 0.0848,
+        "divergence_score": 1.6205
+      },
+      "status": "ok"
+    },
+    {
+      "name": "NEON.D19.BONA.DP1.00042_UN_1000",
+      "lat": 65.15401,
+      "lon": -147.50258,
+      "year": 2023,
+      "spatial": {
+        "cv_ndvi": 0.0797,
+        "water_pct": 0.0,
+        "urban_pct": 0.0011,
+        "summer_doy": 206,
+        "n_images": 1
+      },
+      "phenology": {
+        "year": 2023,
+        "phenophase_gap_days": 22.75,
+        "dtw_per_step": 0.0212,
+        "divergence_score": 1.6462
+      },
+      "status": "ok"
+    },
+    {
+      "name": "willowcreek_DB_1000",
+      "lat": 45.805986,
+      "lon": -90.07912,
+      "year": 2024,
+      "spatial": {
+        "cv_ndvi": 0.048,
+        "water_pct": 0.0007,
+        "urban_pct": 0.0008,
+        "summer_doy": 192,
+        "n_images": 2
+      },
+      "phenology": {
+        "year": 2024,
+        "phenophase_gap_days": 23.25,
+        "dtw_per_step": 0.0672,
+        "divergence_score": 1.7279
+      },
+      "status": "ok"
+    },
+    {
+      "name": "harvardfarmsouth_DB_1000",
+      "lat": 42.522466,
+      "lon": -72.182339,
+      "year": 2024,
+      "spatial": {
+        "cv_ndvi": 0.0875,
+        "water_pct": 0.0,
+        "urban_pct": 0.0033,
+        "summer_doy": 192,
+        "n_images": 2
+      },
+      "phenology": {
+        "year": 2024,
+        "phenophase_gap_days": 24.25,
+        "dtw_per_step": 0.0475,
+        "divergence_score": 1.7796
+      },
+      "status": "ok"
+    },
+    {
+      "name": "morganmonroe2_DB_1000",
+      "lat": 39.3231,
+      "lon": -86.4131,
+      "year": 2023,
+      "spatial": {
+        "cv_ndvi": 0.0567,
+        "water_pct": 0.0001,
+        "urban_pct": 0.0023,
+        "summer_doy": 196,
+        "n_images": 1
+      },
+      "phenology": {
+        "year": 2023,
+        "phenophase_gap_days": 26.25,
+        "dtw_per_step": 0.0361,
+        "divergence_score": 1.9111
+      },
+      "status": "ok"
+    },
+    {
+      "name": "NEON.D19.BONA.DP1.00042_UN_1000",
+      "lat": 65.15401,
+      "lon": -147.50258,
+      "year": 2024,
+      "spatial": {
+        "cv_ndvi": 0.0836,
+        "water_pct": 0.0,
+        "urban_pct": 0.0012,
+        "summer_doy": 189,
+        "n_images": 4
+      },
+      "phenology": {
+        "year": 2024,
+        "phenophase_gap_days": 27.75,
+        "dtw_per_step": 0.0276,
+        "divergence_score": 2.0098
+      },
+      "status": "ok"
+    },
+    {
+      "name": "lostcreek_WL_1000",
+      "lat": 46.0827,
+      "lon": -89.9792,
+      "year": 2024,
+      "spatial": {
+        "cv_ndvi": 0.0931,
+        "water_pct": 0.0043,
+        "urban_pct": 0.0031,
+        "summer_doy": 199,
+        "n_images": 4
+      },
+      "phenology": {
+        "year": 2024,
+        "phenophase_gap_days": 28.25,
+        "dtw_per_step": 0.025,
+        "divergence_score": 2.0429
+      },
+      "status": "ok"
+    },
+    {
+      "name": "NEON.D19.BONA.DP1.00033_EN_1000",
+      "lat": 65.15401,
+      "lon": -147.50258,
+      "year": 2024,
+      "spatial": {
+        "cv_ndvi": 0.0836,
+        "water_pct": 0.0,
+        "urban_pct": 0.0012,
+        "summer_doy": 202,
+        "n_images": 4
+      },
+      "phenology": {
+        "year": 2024,
+        "phenophase_gap_days": 26.75,
+        "dtw_per_step": 0.1371,
+        "divergence_score": 2.0478
+      },
+      "status": "ok"
+    },
+    {
+      "name": "harvardhemlock2_EN_2000",
+      "lat": 42.539407,
+      "lon": -72.177976,
+      "year": 2024,
+      "spatial": {
+        "cv_ndvi": 0.0791,
+        "water_pct": 0.0001,
+        "urban_pct": 0.0026,
+        "summer_doy": 194,
+        "n_images": 2
+      },
+      "phenology": {
+        "year": 2024,
+        "phenophase_gap_days": 26.5,
+        "dtw_per_step": 0.1629,
+        "divergence_score": 2.0558
+      },
+      "status": "ok"
+    },
+    {
+      "name": "coweeta_DB_2000",
+      "lat": 35.0592,
+      "lon": -83.4275,
+      "year": 2023,
+      "spatial": {
+        "cv_ndvi": 0.0645,
+        "water_pct": 0.0,
+        "urban_pct": 0.0009,
+        "summer_doy": 199,
+        "n_images": 2
+      },
+      "phenology": {
+        "year": 2023,
+        "phenophase_gap_days": 34.25,
+        "dtw_per_step": 0.0348,
+        "divergence_score": 2.4813
+      },
+      "status": "ok"
+    },
+    {
+      "name": "harvardbarn_DB_1000",
+      "lat": 42.53532,
+      "lon": -72.1899,
+      "year": 2024,
+      "spatial": {
+        "cv_ndvi": 0.08,
+        "water_pct": 0.0,
+        "urban_pct": 0.0028,
+        "summer_doy": 214,
+        "n_images": 4
+      },
+      "phenology": {
+        "year": 2024,
+        "phenophase_gap_days": 34.5,
+        "dtw_per_step": 0.0397,
+        "divergence_score": 2.504
+      },
+      "status": "ok"
+    },
+    {
+      "name": "NEON.D01.HARV.DP1.00042_UN_1000",
+      "lat": 42.536911,
+      "lon": -72.17265,
+      "year": 2024,
+      "spatial": {
+        "cv_ndvi": 0.0732,
+        "water_pct": 0.0,
+        "urban_pct": 0.0027,
+        "summer_doy": 214,
+        "n_images": 4
+      },
+      "phenology": {
+        "year": 2024,
+        "phenophase_gap_days": 37.25,
+        "dtw_per_step": 0.036,
+        "divergence_score": 2.6968
+      },
+      "status": "ok"
+    },
+    {
+      "name": "robinson_DB_1000",
+      "lat": 37.4671,
+      "lon": -83.1576,
+      "year": 2023,
+      "spatial": {
+        "cv_ndvi": 0.0554,
+        "water_pct": 0.0002,
+        "urban_pct": 0.0015,
+        "summer_doy": 200,
+        "n_images": 10
+      },
+      "phenology": {
+        "year": 2023,
+        "phenophase_gap_days": 40.0,
+        "dtw_per_step": 0.036,
+        "divergence_score": 2.8931
+      },
+      "status": "ok"
+    },
+    {
+      "name": "harvardfarmnorth_AG_1000",
+      "lat": 42.520465,
+      "lon": -72.182242,
+      "year": 2024,
+      "spatial": {
+        "cv_ndvi": 0.0782,
+        "water_pct": 0.0,
+        "urban_pct": 0.0035,
+        "summer_doy": 212,
+        "n_images": 4
+      },
+      "phenology": {
+        "year": 2024,
+        "phenophase_gap_days": 46.0,
+        "dtw_per_step": 0.0587,
+        "divergence_score": 3.3444
+      },
+      "status": "ok"
+    },
+    {
+      "name": "harvardfarmsouth_AG_1000",
+      "lat": 42.522466,
+      "lon": -72.182339,
+      "year": 2024,
+      "spatial": {
+        "cv_ndvi": 0.0779,
+        "water_pct": 0.0,
+        "urban_pct": 0.0055,
+        "summer_doy": 256,
+        "n_images": 3
+      },
+      "phenology": {
+        "year": 2024,
+        "phenophase_gap_days": 47.25,
+        "dtw_per_step": 0.0346,
+        "divergence_score": 3.4096
+      },
+      "status": "ok"
+    },
+    {
+      "name": "alercecosteroforest_EN_1000",
+      "lat": -40.1726,
+      "lon": -73.4439,
+      "year": 2023,
+      "spatial": {
+        "cv_ndvi": 0.0624,
+        "water_pct": 0.0001,
+        "urban_pct": 0.0002,
+        "summer_doy": 221,
+        "n_images": 1
+      },
+      "phenology": {
+        "year": 2023,
+        "phenophase_gap_days": 45.0,
+        "dtw_per_step": 0.2001,
+        "divergence_score": 3.4144
+      },
+      "status": "ok"
+    },
+    {
+      "name": "harvardbarn_EN_1000",
+      "lat": 42.53532,
+      "lon": -72.1899,
+      "year": 2023,
+      "spatial": {
+        "cv_ndvi": 0.0855,
+        "water_pct": 0.0,
+        "urban_pct": 0.0048,
+        "summer_doy": 239,
+        "n_images": 1
+      },
+      "phenology": {
+        "year": 2023,
+        "phenophase_gap_days": 50.75,
+        "dtw_per_step": 0.0687,
+        "divergence_score": 3.6937
+      },
+      "status": "ok"
+    },
+    {
+      "name": "witnesstree_DB_1000",
+      "lat": 42.53556197,
+      "lon": -72.18956997,
+      "year": 2024,
+      "spatial": {
+        "cv_ndvi": 0.078,
+        "water_pct": 0.0,
+        "urban_pct": 0.0049,
+        "summer_doy": 232,
+        "n_images": 2
+      },
+      "phenology": {
+        "year": 2024,
+        "phenophase_gap_days": 50.0,
+        "dtw_per_step": 0.1511,
+        "divergence_score": 3.7225
+      },
+      "status": "ok"
+    },
+    {
+      "name": "tfforest_DB_1001",
+      "lat": 43.1086,
+      "lon": -70.9505,
+      "year": 2023,
+      "spatial": {
+        "cv_ndvi": 0.099,
+        "water_pct": 0.0006,
+        "urban_pct": 0.0084,
+        "summer_doy": 240,
+        "n_images": 6
+      },
+      "phenology": {
+        "year": 2023,
+        "phenophase_gap_days": 52.25,
+        "dtw_per_step": 0.0439,
+        "divergence_score": 3.776
+      },
+      "status": "ok"
+    },
+    {
+      "name": "rosalia_EN_1000",
+      "lat": 47.7027,
+      "lon": 16.3015,
+      "year": 2023,
+      "spatial": {
+        "cv_ndvi": 0.0998,
+        "water_pct": 0.0001,
+        "urban_pct": 0.0133,
+        "summer_doy": 298,
+        "n_images": 4
+      },
+      "phenology": {
+        "year": 2023,
+        "phenophase_gap_days": 60.5,
+        "dtw_per_step": 0.1075,
+        "divergence_score": 4.4289
+      },
+      "status": "ok"
+    },
+    {
+      "name": "witnesstree_DB_1000",
+      "lat": 42.53556197,
+      "lon": -72.18956997,
+      "year": 2023,
+      "spatial": {
+        "cv_ndvi": 0.0928,
+        "water_pct": 0.0001,
+        "urban_pct": 0.0141,
+        "summer_doy": 282,
+        "n_images": 3
+      },
+      "phenology": {
+        "year": 2023,
+        "phenophase_gap_days": 72.75,
+        "dtw_per_step": 0.0615,
+        "divergence_score": 5.258
+      },
+      "status": "ok"
+    }
+  ]
+}
