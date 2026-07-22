@@ -1,8 +1,8 @@
-"""Create an interactive map for pipeline-selected site-years.
+"""Create an interactive map for pipeline selected site-years.
 
-By default this reads the loose-threshold pipeline results and writes a Leaflet
-HTML map with one pin per surviving site-year. A golden-site mode can filter the
-map down to only isolated USA rows, matching the gold-row logic used in the
+By default this reads the loose threshold pipeline results and writes a Leaflet
+HTML map with one pin per surviving site-year. A golden site mode can filter the
+map down to only isolated USA rows, matching the gold row logic used in the
 report generator.
 """
 
@@ -17,19 +17,23 @@ from pathlib import Path
 
 BASE_DIR = Path(__file__).resolve().parent
 DEFAULT_INPUT = BASE_DIR / "output" / "Full_loose" / "pipeline_results.json"
-CLOSE_KM = 4.0
+CLOSE_KM = 4.0  # two sites closer than this count as not isolated
 
 
+# Site loading and value formatting
 def _load_sites(input_path: Path) -> tuple[list[dict], dict]:
+	"""Read a pipeline_results.json; return (list of site rows, full payload)."""
 	data = json.loads(input_path.read_text())
 	return data.get("sites", []), data
 
 
 def _safe_text(value) -> str:
+	"""HTML escape a value for safe embedding in a popup (None becomes empty)."""
 	return html.escape("" if value is None else str(value), quote=True)
 
 
 def _format_number(value, digits: int = 3) -> str:
+	"""Fixed decimal string for a metric, or 'n/a' when missing/not numeric."""
 	if value is None:
 		return "n/a"
 	try:
@@ -39,6 +43,7 @@ def _format_number(value, digits: int = 3) -> str:
 
 
 def _marker_popup(site: dict) -> str:
+	"""Build the HTML popup (name, year, status, and scores) for one map pin."""
 	spatial = site.get("spatial") or {}
 	phenology = site.get("phenology") or {}
 	status = site.get("status") or "n/a"
@@ -56,7 +61,9 @@ def _marker_popup(site: dict) -> str:
 	return "<br>".join(lines)
 
 
+# Geo helpers (distance, USA test, golden-site test)
 def _haversine_km(a: tuple[float, float], b: tuple[float, float]) -> float:
+	"""Great circle distance in km between two (lat, lon) points."""
 	radius_km = 6371.0
 	lat1, lon1 = map(math.radians, a)
 	lat2, lon2 = map(math.radians, b)
@@ -67,6 +74,11 @@ def _haversine_km(a: tuple[float, float], b: tuple[float, float]) -> float:
 
 
 def _is_in_usa(lat: float, lon: float) -> bool:
+	"""Rough US latitude test covering the CONUS, Alaska, and Hawaii bands.
+
+	Only latitude is checked (longitude is ignored), so this is a coarse filter
+	meant to match the report generator's gold row logic, not a precise boundary.
+	"""
 	return (
 		24.0 <= lat <= 50.0
 		or 51.0 <= lat <= 72.0
@@ -75,6 +87,7 @@ def _is_in_usa(lat: float, lon: float) -> bool:
 
 
 def _is_golden_site(site: dict, all_sites: list[dict]) -> bool:
+	"""True when the site is in the USA and isolated (no other within CLOSE_KM)."""
 	lat = site.get("lat")
 	lon = site.get("lon")
 	if lat is None or lon is None or not _is_in_usa(float(lat), float(lon)):
@@ -93,12 +106,18 @@ def _is_golden_site(site: dict, all_sites: list[dict]) -> bool:
 
 
 def _selected_sites(sites: list[dict], golden_only: bool) -> list[dict]:
+	"""Every site, or only the golden (isolated USA) ones when golden_only."""
 	if not golden_only:
 		return sites
 	return [site for site in sites if _is_golden_site(site, sites)]
 
 
+# HTML rendering
 def _build_html(sites: list[dict], title: str, *, golden_only: bool = False) -> str:
+	"""Render the full Leaflet page with one clustered pin per selected site.
+
+	Raises ValueError if no selected site has usable lat/lon coordinates.
+	"""
 	selected_sites = _selected_sites(sites, golden_only)
 	points = []
 	for site in selected_sites:
@@ -227,7 +246,9 @@ def _build_html(sites: list[dict], title: str, *, golden_only: bool = False) -> 
 """
 
 
+# Public map builders + CLI
 def build_map(input_path: Path, output_path: Path, title: str | None = None) -> Path:
+	"""Write the HTML map of every surviving site-year and return its path."""
 	sites, _payload = _load_sites(input_path)
 	title = title or f"Loose-threshold validation sites ({input_path.stem})"
 	output_path.parent.mkdir(parents=True, exist_ok=True)
@@ -236,6 +257,7 @@ def build_map(input_path: Path, output_path: Path, title: str | None = None) -> 
 
 
 def build_golden_map(input_path: Path, output_path: Path, title: str | None = None) -> Path:
+	"""Write the HTML map of only the golden (isolated USA) sites, return its path."""
 	sites, _payload = _load_sites(input_path)
 	title = title or f"Golden validation sites ({input_path.stem})"
 	output_path.parent.mkdir(parents=True, exist_ok=True)
@@ -244,6 +266,7 @@ def build_golden_map(input_path: Path, output_path: Path, title: str | None = No
 
 
 def parse_args() -> argparse.Namespace:
+	"""Parse CLI arguments (input, output, title, golden-only)."""
 	parser = argparse.ArgumentParser(description="Build an interactive map of selected site-years.")
 	parser.add_argument("--input", type=Path, default=DEFAULT_INPUT, help="Path to pipeline_results.json")
 	parser.add_argument(
@@ -267,6 +290,7 @@ def parse_args() -> argparse.Namespace:
 
 
 def main() -> None:
+	"""CLI entry: build the full or golden only map from a pipeline_results.json."""
 	args = parse_args()
 	output_path = args.output or args.input.with_name(f"{args.input.stem}_map.html")
 	if args.golden_only:

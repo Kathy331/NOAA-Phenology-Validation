@@ -2,12 +2,15 @@
 
     site_metadata_clean.json  ->  entries (name/lat/lon/year + cached scores + MOS/DOS)
                               ->  Step 1: Earth Engine spatial uniformity (survivors)
-                              ->  Step 2: reuse cached NDVI-vs-GCC scores on survivors
+                              ->  Step 2: reuse cached NDVI vs GCC scores on survivors
                               ->  pipeline_results.json (survivors ranked by divergence)
 
-The input is the pre-computed site_metadata_clean.json (produced by src/api/main.py),
-so the pipeline makes no live PhenoCam calls -- only Earth Engine (Step 1) hits the
+The input is the pre-computed site_metadata_clean.json (produced by prep/api/main.py),
+so the pipeline makes no live PhenoCam calls; only Earth Engine (Step 1) hits the
 network. Set PIPELINE_LIMIT=<N> to only process the first N site-years.
+
+Run with:
+    cd pipeline && python3 run_pipeline.py
 """
 
 import json
@@ -21,7 +24,7 @@ def load_entries() -> tuple[list[dict], list[str]]:
 	"""Build site-year entries from the cached site_metadata_clean.json.
 
 	Each entry carries name/lat/lon/year, the cached phenology scores, and the
-	NDVI MOS/DOS DOYs used to center Step 1's peak-summer window. Entries missing
+	NDVI MOS/DOS DOYs used to center Step 1's peak summer window. Entries missing
 	lat/lon are reported as `missing`.
 	"""
 	data = json.loads(config.SITE_METADATA_JSON.read_text())

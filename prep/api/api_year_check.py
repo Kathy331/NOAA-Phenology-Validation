@@ -4,7 +4,7 @@ Pulls the full ROI list from /api/roilists/, downloads each NDVI 3 day summary
 (only ROIs with an IR/NDVI product), and inspects the available years. Each ROI
 is sorted into one of three buckets: has 2023 only, has 2024 only, or has both.
 
-Run with:  python src/api/api_year_check.py
+Run with:  python prep/api/api_year_check.py
 
 The resulting site lists are recorded in output/api/year_check.json
 """
@@ -14,15 +14,11 @@ import sys
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
 
-#(plotting, PhenoloDates files)
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+# Run with:  cd prep/api && python3 api_year_check.py
+# repo root for shared package imports
+sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 
-from phenocam_api import (  
-	fetch_ndvi_3day_for_roi,
-	list_rois,
-	load_timeseries,
-	roi_ndvi_3day_url,
-)
+from shared.phenocam_api import fetch_ndvi_3day_for_roi, list_rois, load_timeseries, roi_ndvi_3day_url
 
 TARGET_YEARS = (2023, 2024)
 MAX_WORKERS = 20 

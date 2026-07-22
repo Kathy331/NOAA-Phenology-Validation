@@ -1,15 +1,15 @@
 """Step 1: spatial-uniformity screening with Earth Engine.
 
-For each site-year, find a cloud-free Sentinel-2 composite from the middle of the
+For each site-year, find a cloud free Sentinel-2 composite from the middle of the
 growing season (midpoint of the cached NDVI MOS..DOS dates, with a hemisphere
 fallback), then measure how uniform peak-summer NDVI is inside a ~4 km box:
 
     passed = NDVI CV < CV_MAX  AND  water% < WATER_MAX  AND  (urban% + bare%) < NONVEG_MAX
 
 Surface fractions (water/bare/urban) are read from the ESA WorldCover map, and the
-gate uses the combined non-vegetated fraction (built-up + bare).
+gate uses the combined non-vegetated fraction (built up + bare).
 
-The MOS/DOS dates come pre-computed from site_metadata_clean.json, so no PhenoCam
+The MOS/DOS dates come pre computed from site_metadata_clean.json, so no PhenoCam
 call is made here. Results (every evaluated site) are written to
 step1_uniformity.json.
 """
@@ -30,10 +30,10 @@ def _finite(value) -> bool:
 
 
 def summer_center(year: int, lat: float, mos=None, dos=None) -> tuple[date, int, str]:
-	"""Peak-summer center date for a site-year.
+	"""Peak summer center date for a site-year.
 
-	Uses the midpoint of the (pre-computed) NDVI MOS and DOS DOYs when both are
-	available; otherwise falls back to a hemisphere-appropriate mid-summer DOY.
+	Uses the midpoint of the (pre computed) NDVI MOS and DOS DOYs when both are
+	available; otherwise falls back to a hemisphere appropriate mid summer DOY.
 	Returns (center_date, summer_doy, source).
 	"""
 	if _finite(mos) and _finite(dos):
@@ -62,7 +62,7 @@ def evaluate_site(entry: dict) -> dict:
 	"""Compute Step 1 metrics and pass/fail for one cached site-year entry.
 
 	`entry` is {name, lat, lon, year, mos, dos, ...} from site_metadata_clean.json;
-	no PhenoCam call is made -- MOS/DOS are used directly to center the window.
+	no PhenoCam call is made; MOS/DOS are used directly to center the window.
 	"""
 	name, year = entry["name"], entry["year"]
 	lat, lon = entry.get("lat"), entry.get("lon")

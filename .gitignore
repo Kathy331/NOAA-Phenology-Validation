@@ -1,9 +1,10 @@
 __pycache__/
 .venv/
+.DS_Store
 
 #this is where the api plots are saved, ignore generated plots
-src/output/api/*
-!src/output/api/.gitkeep
+prep/output/api/*
+!prep/output/api/.gitkeep
 
 
 #personal notes

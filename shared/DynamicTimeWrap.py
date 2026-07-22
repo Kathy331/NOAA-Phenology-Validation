@@ -1,7 +1,8 @@
 """Compare how well each PhenoCam site's NDVI and GCC curves agree
 
 All comparisons are done for a single year (`YEAR`, configurable / any year).
-Callers pass whichever year they are scoring.
+take a `year` argument, so callers like api_batch.py and api_single.py 
+pass whichever year they are plotting. 
 
   1. Phenophase date comparison
      The per phase NDVI vs GCC day gaps are averaged into a mean phenophase gap.
@@ -11,9 +12,8 @@ Callers pass whichever year they are scoring.
      min max normalized to [0, 1], then compared with DTW. Low distance = similar shape and timing.
 
 The two are combined into a single divergence score per site (lower = better).
-
-Self-contained duplicate for the pipeline/ folder (originally src/api/DynamicTimeWrap.py).
-Imports now reference local siblings; the sys.path bootstrap is dropped.
+Running this file computes that score for every candidate site and saves them to
+year output JSON; multi threading speeds up the per-site downloads/comparisons.
 """
 
 import json
@@ -23,28 +23,29 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 
-from PhenoloDates import compute_phases
-from phenocam_api import (
+from .PhenoloDates import compute_phases
+from .phenocam_api import (
 	fetch_ndvi_3day_for_roi,
 	list_rois,
 	load_timeseries,
 )
 
-BASE_DIR = Path(__file__).resolve().parent
+# reads/writes the data prep JSONs under prep/output/api
+REPO_DIR = Path(__file__).resolve().parent.parent
 
-YEAR = 2024  # year to compare NDVI vs GCC (may pass in any year)
-PHENOPHASE_KEYS = ("SOS", "MOS", "DOS", "EOS")  # the phases compute_phases returns
-CANDIDATE_GAP_DAYS = 14  # used to scale the phenophase part of the divergence score
-MIN_POINTS = 10  # need at least this many samples in a year to score it
-MAX_WORKERS = 20
+YEAR = 2024  # year to compare NDVI vs GCC (may pass in any year w/ function: site_agreement_score(timeseries, year))
+PHENOPHASE_KEYS = ("SOS", "MOS", "DOS", "EOS")   
+CANDIDATE_GAP_DAYS = 14 						 # divergence score scaling factor				
+MIN_POINTS = 10 								 # minimum number of samples, otherwise score is NaN
+MAX_WORKERS = 20 
 
-YEAR_CHECK_JSON = BASE_DIR / "input" / "year_check.json"
-OUTPUT_JSON = BASE_DIR / "output" / "site_ranking.json"
+YEAR_CHECK_JSON = REPO_DIR / "prep" / "output" / "api" / "year_check.json"
+OUTPUT_JSON = REPO_DIR / "prep" / "output" / "api" / "site_ranking.json"
 
-
+ 
 # Phenophase date comparison (CCRmax, via PhenoloDates.compute_phases)
 def phenophase_gaps(ndvi_phases: dict[str, float], gcc_phases: dict[str, float]) -> dict[str, float]:
-	"""Absolute NDVI-vs-GCC day gaps per phase plus their mean.
+	"""Absolute NDVI vs GCC day gaps per phase plus their mean.
 
 	Keys: SOS_gap, MOS_gap, DOS_gap, EOS_gap, mean_gap. The mean ignores phases
 	that are missing (np.nan) in either series.
@@ -60,7 +61,7 @@ def phenophase_gaps(ndvi_phases: dict[str, float], gcc_phases: dict[str, float])
 
 
 def phenophase_score(timeseries: pd.DataFrame, year: int = YEAR) -> tuple[float, dict]:
-	"""Mean NDVI-vs-GCC phenophase gap (days) for a single `year`.
+	"""Mean NDVI vs GCC phenophase gap (days) for a single `year`.
 
 	Returns (score, detail). score is np.nan if the year cannot be scored; detail
 	holds the per-curve phase dates and the per-phase gaps.
@@ -105,7 +106,13 @@ def dtw_distance(a, b) -> float:
 
 
 def _aligned_normalized_year(timeseries: pd.DataFrame, year: int):
-	"""Daily-aligned, gap-filled, [0,1]-normalized (ndvi, gcc) for one year."""
+	"""
+	1. Daily resampling: Convert the raw data to daily averages, filling gaps with the mean of the surrounding days.
+	2. Gap filling: Use linear interpolation to fill in missing data points.
+	3. Forward/backward filling: Fill in missing data points at the start and end of the year.
+	4. Normalization: Scale the data to [0,1] range.
+	5. Return the normalized NDVI and GCC curves.
+	"""
 	year_df = (
 		timeseries.loc[timeseries["year"] == year, ["date", "ndvi_90", "gcc_90"]]
 		.dropna(subset=["date"])
@@ -130,15 +137,14 @@ def dtw_score(timeseries: pd.DataFrame, year: int = YEAR) -> float:
 	ndvi_norm, gcc_norm = prepared
 	return dtw_distance(ndvi_norm, gcc_norm)
 
-
+ 
 # Divergence score (phenophase gap + per-step DTW)
 def site_agreement_score(timeseries: pd.DataFrame, year: int = YEAR) -> dict[str, float]:
-	"""NDVI-vs-GCC divergence score for a single site and `year`.
+	"""NDVI vs GCC divergence score for a single site and `year`.
 
 	Combines the phenophase gap (scaled by CANDIDATE_GAP_DAYS) with the per-step
-	DTW cost into one self-contained number. Returns the year,
-	phenophase_gap_days, dtw_per_step, and their sum as `divergence_score`
-	(lower = better agreement).
+	DTW cost into one self-contained number. Returns the year, phenophase gap days,
+	DTW per step, and their sum as `divergence_score` (lower = better agreement).
 	"""
 	pheno, _ = phenophase_score(timeseries, year)
 
@@ -163,12 +169,12 @@ def site_agreement_score(timeseries: pd.DataFrame, year: int = YEAR) -> dict[str
 	}
 
 
-# Driver
+# load the candidate site names from the year check JSON (check input folder for year_check.json)
 def load_candidate_names() -> list[str]:
 	"""roi_names with both 2023 and 2024 data, from year_check.json."""
 	if not YEAR_CHECK_JSON.exists():
 		raise FileNotFoundError(
-			f"{YEAR_CHECK_JSON} not found -- copy year_check.json into pipeline/input/ first."
+			f"{YEAR_CHECK_JSON} not found; run prep/api/api_year_check.py first to generate it."
 		)
 	data = json.loads(YEAR_CHECK_JSON.read_text())
 	return data["has_both_2023_and_2024"]

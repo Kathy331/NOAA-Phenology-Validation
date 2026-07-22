@@ -10,7 +10,7 @@
     doc/PhenoCam GBOV sites.xlsx, saved (clean style) to site_GBOV_clean.json.
   - plot_site(name, year): saves one site's NDVI/GCC time series plot.
 
-Run with:  python3 src/api/main.py
+Run with:  python3 prep/api/main.py
 """
 
 import json
@@ -22,23 +22,14 @@ from pathlib import Path
 
 import pandas as pd
 
-# src on the path so functions here can reach PhenoloDates / plotting too.
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+# Run with:  cd prep/api && python3 main.py
+# repo root for shared package imports
+sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 
-from DynamicTimeWrap import ( 
-	_fetch_timeseries,
-	_jsonable,
-	site_agreement_score,
-)
-from PhenoloDates import compute_phases
-from phenocam_api import ( 
-	fetch_ndvi_3day_for_roi,
-	find_roi,
-	list_rois,
-	load_timeseries,
-	roi_ndvi_3day_url,
-)
-from plotting import create_plot, save_plot  
+from shared.DynamicTimeWrap import _fetch_timeseries, _jsonable, site_agreement_score
+from shared.PhenoloDates import compute_phases
+from shared.phenocam_api import fetch_ndvi_3day_for_roi, find_roi, list_rois, load_timeseries, roi_ndvi_3day_url
+from shared.plotting import create_plot, save_plot
 
 MAX_WORKERS = 20
 
@@ -50,7 +41,7 @@ SITE_GEE_CLEAN_JSON = OUTPUT_DIR / "site_GEE_clean.json"
 SITE_TOP_JSON = OUTPUT_DIR / "site_top.json"
 SITE_GBOV_CLEAN_JSON = OUTPUT_DIR / "site_GBOV_clean.json"
 
-# Mentor-supplied NEON/GBOV validation sites (Site name + ROI Subset + year X marks).
+# NEON/GBOV validation sites (Site name + ROI Subset + year X marks).
 GBOV_XLSX = Path(__file__).resolve().parent.parent.parent / "doc" / "PhenoCam GBOV sites.xlsx"
 
 
@@ -262,7 +253,7 @@ def build_gbov_metadata(
 	Fetches PhenoCam NDVI/GCC for each Site name + ROI Subset and requested year,
 	computes the same metadata as build_site_metadata (phenophase gap, DTW/step,
 	divergence, plus the NDVI/GCC phase dates), groups by year bucket, and drops
-	null-score entries -- identical structure to site_metadata_clean.json.
+	null-score entries, giving the same structure as site_metadata_clean.json.
 	"""
 	rois_by_name = {roi["roi_name"]: roi for roi in list_rois()}
 	tasks, missing = load_gbov_tasks(xlsx_path, rois_by_name)

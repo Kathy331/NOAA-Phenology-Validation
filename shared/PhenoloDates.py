@@ -12,18 +12,14 @@ Used by test.py to create the plots:
 See doc/PhenoloDates.md for the method (CCRmax / Zhang et al., 2003)
 """
 
+import warnings
+
 import numpy as np
-from scipy.optimize import curve_fit # logistic function
+from scipy.optimize import OptimizeWarning, curve_fit # logistic function
 
-# Returned for any phase that could not be computed
-MISSING_PHASE = np.nan
-
-# Minimum number of valid samples even before attempting fit
-MIN_POINTS = 10
-
-# The seasonal peak must sit at least this many samples from either end, so that
-# both the green up and senescence halves have enough points to fit
-EDGE_MARGIN = 5
+MISSING_PHASE = np.nan 			# returned for any phase that could not be computed
+MIN_POINTS = 10 				# minimum number of valid samples even before attempting fit
+EDGE_MARGIN = 5 				# seasonal peak must sit at least this many samples from either end
 
 
 def _clean(doy, values) -> tuple[np.ndarray, np.ndarray]:
@@ -43,16 +39,22 @@ def _fit_logistic(t: np.ndarray, y: np.ndarray):
 	percentiles, so only the two shape parameters a and b are optimized. Fixing
 	the level this way keeps the fit stable on short or noisy half seasons 
 	"""
-	background = np.percentile(y, 5)              # d: dormant / baseline VI
-	amplitude = np.percentile(y, 95) - background  # c: seasonal range
+	background = np.percentile(y, 5)               # d: dormant (5th percentile)
+	amplitude = np.percentile(y, 95) - background  # c: seasonal (95th percentile)
 	if amplitude <= 0:
 		return None
 
 	def logistic(x, a, b):
 		return amplitude / (1 + np.exp(a + b * x)) + background
 
+	# Degenerate (flat/noisy) half seasons make exp() overflow and the covariance
+	# unestimable; those fits are handled as failures/NaN downstream, so quiet the
+	# expected numerical noise instead of spamming it per site.
 	try:
-		(a, b), _ = curve_fit(logistic, t, y, p0=[0.6557, 0.00957])
+		with warnings.catch_warnings(), np.errstate(over="ignore", invalid="ignore"):
+			warnings.simplefilter("ignore", OptimizeWarning)
+			warnings.simplefilter("ignore", RuntimeWarning)
+			(a, b), _ = curve_fit(logistic, t, y, p0=[0.6557, 0.00957])
 	except (RuntimeError, ValueError):
 		return None
 	return a, b, amplitude
@@ -66,18 +68,22 @@ def _curvature_change_rate(t: np.ndarray, a: float, b: float, c: float):
 	Returns (days, k_prime) over the integer DOY span of t
 	"""
 	days = np.arange(t[0], t[-1] + 1)
-	z = np.exp(a + b * days)
+	# A steep/degenerate fit sends z past the float64 range; the resulting
+	# inf/nan curvature just yields a NaN phase downstream, so silence the
+	# expected overflow/invalid noise rather than emitting it for every site.
+	with np.errstate(over="ignore", invalid="ignore", divide="ignore"):
+		z = np.exp(a + b * days)
 
-	# Shared denominator (1+z)^4 + (b*c*z)^2 appears at powers 1.5 and 2.5 
-	base = np.power(1 + z, 4) + np.power(b * c * z, 2)
-	term_grow = (
-		3 * z * (1 - z) * np.power(1 + z, 3)
-		* (2 * np.power(1 + z, 3) + np.power(b, 2) * np.power(c, 2) * z)
-	)
-	term_decay = np.power(1 + z, 2) * (1 + 2 * z - 5 * np.power(z, 2))
-	k_prime = np.power(b, 3) * c * z * (
-		term_grow / np.power(base, 2.5) - term_decay / np.power(base, 1.5)
-	)
+		# Shared denominator (1+z)^4 + (b*c*z)^2 appears at powers 1.5 and 2.5 
+		base = np.power(1 + z, 4) + np.power(b * c * z, 2)
+		term_grow = (
+			3 * z * (1 - z) * np.power(1 + z, 3)
+			* (2 * np.power(1 + z, 3) + np.power(b, 2) * np.power(c, 2) * z)
+		)
+		term_decay = np.power(1 + z, 2) * (1 + 2 * z - 5 * np.power(z, 2))
+		k_prime = np.power(b, 3) * c * z * (
+			term_grow / np.power(base, 2.5) - term_decay / np.power(base, 1.5)
+		)
 	return days, k_prime
 
 

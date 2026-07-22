@@ -1,8 +1,13 @@
+import sys
 from pathlib import Path
 
 import pandas as pd
 
-from plotting import create_plot, is_interactive_backend, save_plot, show_plots
+# Run with:  cd test && python3 test.py
+# repo root for shared package imports
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+
+from shared.plotting import create_plot, is_interactive_backend, save_plot, show_plots  
 
 DIR = Path(__file__).parent
 DATA_DIR = DIR / "data"

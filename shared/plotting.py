@@ -1,9 +1,6 @@
 """Plotting and styling for the PhenoCam time series figures.
 
-Keeps all matplotlib/figure styling concerns out of the driver scripts.
-
-Self-contained duplicate for the pipeline/ folder (originally src/plotting.py).
-Kept for parity/reuse; the screening pipeline itself does not require it.
+Keeps all matplotlib/figure styling concerns out of test.py.
 """
 
 import math
@@ -11,7 +8,7 @@ import matplotlib.dates as mdates
 import matplotlib.pyplot as plt
 import pandas as pd
 
-from PhenoloDates import compute_phases
+from .PhenoloDates import compute_phases
 
 GCC_COLOR = "#1f77b4"
 NDVI_COLOR = "#d62728"
