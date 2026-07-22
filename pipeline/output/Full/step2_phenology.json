@@ -1,7 +1,7 @@
 {
   "counts": {
-    "evaluated": 38,
-    "scored": 38
+    "evaluated": 44,
+    "scored": 44
   },
   "sites": [
     {
@@ -14,45 +14,6 @@
         "phenophase_gap_days": 12.5,
         "dtw_per_step": 0.0364,
         "divergence_score": 0.9292
-      },
-      "status": "ok"
-    },
-    {
-      "name": "NEON.D01.HARV.DP1.00042_UN_1000",
-      "lat": 42.536911,
-      "lon": -72.17265,
-      "year": 2024,
-      "metadata": {
-        "year": 2024,
-        "phenophase_gap_days": 37.25,
-        "dtw_per_step": 0.036,
-        "divergence_score": 2.6968
-      },
-      "status": "ok"
-    },
-    {
-      "name": "NEON.D07.GRSM.DP1.00033_DB_1000",
-      "lat": 35.68896,
-      "lon": -83.50195,
-      "year": 2023,
-      "metadata": {
-        "year": 2023,
-        "phenophase_gap_days": 7.0,
-        "dtw_per_step": 0.019,
-        "divergence_score": 0.519
-      },
-      "status": "ok"
-    },
-    {
-      "name": "NEON.D07.GRSM.DP1.00042_UN_1000",
-      "lat": 35.68896,
-      "lon": -83.50195,
-      "year": 2023,
-      "metadata": {
-        "year": 2023,
-        "phenophase_gap_days": 12.0,
-        "dtw_per_step": 0.023,
-        "divergence_score": 0.8802
       },
       "status": "ok"
     },
@@ -109,15 +70,41 @@
       "status": "ok"
     },
     {
-      "name": "NEON.D08.TALL.DP1.00033_EN_1000",
-      "lat": 32.95047,
-      "lon": -87.393259,
+      "name": "NEON.D14.JORN.DP1.00033_GR_1000",
+      "lat": 32.59068,
+      "lon": -106.84254,
+      "year": 2023,
+      "metadata": {
+        "year": 2023,
+        "phenophase_gap_days": 109.5,
+        "dtw_per_step": 0.1509,
+        "divergence_score": 7.9723
+      },
+      "status": "ok"
+    },
+    {
+      "name": "NEON.D14.JORN.DP1.00033_GR_1000",
+      "lat": 32.59068,
+      "lon": -106.84254,
       "year": 2024,
       "metadata": {
         "year": 2024,
-        "phenophase_gap_days": 21.25,
-        "dtw_per_step": 0.0546,
-        "divergence_score": 1.5725
+        "phenophase_gap_days": 51.0,
+        "dtw_per_step": 0.0926,
+        "divergence_score": 3.7354
+      },
+      "status": "ok"
+    },
+    {
+      "name": "NEON.D15.ONAQ.DP1.00033_SH_1001",
+      "lat": 40.177599,
+      "lon": -112.452452,
+      "year": 2023,
+      "metadata": {
+        "year": 2023,
+        "phenophase_gap_days": 121.0,
+        "dtw_per_step": 0.1346,
+        "divergence_score": 8.7775
       },
       "status": "ok"
     },
@@ -226,19 +213,6 @@
       "status": "ok"
     },
     {
-      "name": "congoflux_EB_1000",
-      "lat": 0.8144,
-      "lon": 24.5024,
-      "year": 2023,
-      "metadata": {
-        "year": 2023,
-        "phenophase_gap_days": 3.0,
-        "dtw_per_step": 0.0804,
-        "divergence_score": 0.2947
-      },
-      "status": "ok"
-    },
-    {
       "name": "coweeta_DB_2000",
       "lat": 35.0592,
       "lon": -83.4275,
@@ -248,19 +222,6 @@
         "phenophase_gap_days": 34.25,
         "dtw_per_step": 0.0348,
         "divergence_score": 2.4813
-      },
-      "status": "ok"
-    },
-    {
-      "name": "harvardbarn_DB_1000",
-      "lat": 42.53532,
-      "lon": -72.1899,
-      "year": 2024,
-      "metadata": {
-        "year": 2024,
-        "phenophase_gap_days": 34.5,
-        "dtw_per_step": 0.0397,
-        "divergence_score": 2.504
       },
       "status": "ok"
     },
@@ -304,19 +265,6 @@
       "status": "ok"
     },
     {
-      "name": "harvardfarmnorth_AG_1000",
-      "lat": 42.520465,
-      "lon": -72.182242,
-      "year": 2024,
-      "metadata": {
-        "year": 2024,
-        "phenophase_gap_days": 46.0,
-        "dtw_per_step": 0.0587,
-        "divergence_score": 3.3444
-      },
-      "status": "ok"
-    },
-    {
       "name": "harvardfarmsouth_AG_1000",
       "lat": 42.522466,
       "lon": -72.182339,
@@ -352,6 +300,136 @@
         "phenophase_gap_days": 26.5,
         "dtw_per_step": 0.1629,
         "divergence_score": 2.0558
+      },
+      "status": "ok"
+    },
+    {
+      "name": "ibp_GR_1000",
+      "lat": 32.589,
+      "lon": -106.847,
+      "year": 2023,
+      "metadata": {
+        "year": 2023,
+        "phenophase_gap_days": 69.75,
+        "dtw_per_step": 0.1301,
+        "divergence_score": 5.1122
+      },
+      "status": "ok"
+    },
+    {
+      "name": "ibp_SH_1000",
+      "lat": 32.589,
+      "lon": -106.847,
+      "year": 2024,
+      "metadata": {
+        "year": 2024,
+        "phenophase_gap_days": 42.5,
+        "dtw_per_step": 0.1104,
+        "divergence_score": 3.1461
+      },
+      "status": "ok"
+    },
+    {
+      "name": "ibp_SH_1001",
+      "lat": 32.589,
+      "lon": -106.847,
+      "year": 2023,
+      "metadata": {
+        "year": 2023,
+        "phenophase_gap_days": 81.75,
+        "dtw_per_step": 0.0607,
+        "divergence_score": 5.9
+      },
+      "status": "ok"
+    },
+    {
+      "name": "ibp_SH_1001",
+      "lat": 32.589,
+      "lon": -106.847,
+      "year": 2024,
+      "metadata": {
+        "year": 2024,
+        "phenophase_gap_days": 21.0,
+        "dtw_per_step": 0.2196,
+        "divergence_score": 1.7196
+      },
+      "status": "ok"
+    },
+    {
+      "name": "ibp_SH_1002",
+      "lat": 32.589,
+      "lon": -106.847,
+      "year": 2024,
+      "metadata": {
+        "year": 2024,
+        "phenophase_gap_days": 44.5,
+        "dtw_per_step": 0.1064,
+        "divergence_score": 3.285
+      },
+      "status": "ok"
+    },
+    {
+      "name": "ibp_XX_1000",
+      "lat": 32.589,
+      "lon": -106.847,
+      "year": 2023,
+      "metadata": {
+        "year": 2023,
+        "phenophase_gap_days": 61.75,
+        "dtw_per_step": 0.1098,
+        "divergence_score": 4.5205
+      },
+      "status": "ok"
+    },
+    {
+      "name": "jergrassland2_GR_1000",
+      "lat": 32.5849,
+      "lon": -106.8261,
+      "year": 2023,
+      "metadata": {
+        "year": 2023,
+        "phenophase_gap_days": 62.0,
+        "dtw_per_step": 0.0842,
+        "divergence_score": 4.5127
+      },
+      "status": "ok"
+    },
+    {
+      "name": "jergrassland2_GR_1000",
+      "lat": 32.5849,
+      "lon": -106.8261,
+      "year": 2024,
+      "metadata": {
+        "year": 2024,
+        "phenophase_gap_days": 33.0,
+        "dtw_per_step": 0.1238,
+        "divergence_score": 2.481
+      },
+      "status": "ok"
+    },
+    {
+      "name": "jernovel_XX_1000",
+      "lat": 32.6335,
+      "lon": -106.8334,
+      "year": 2023,
+      "metadata": {
+        "year": 2023,
+        "phenophase_gap_days": 24.0,
+        "dtw_per_step": 0.1208,
+        "divergence_score": 1.8351
+      },
+      "status": "ok"
+    },
+    {
+      "name": "jernovel_XX_1000",
+      "lat": 32.6335,
+      "lon": -106.8334,
+      "year": 2024,
+      "metadata": {
+        "year": 2024,
+        "phenophase_gap_days": 45.0,
+        "dtw_per_step": 0.0821,
+        "divergence_score": 3.2964
       },
       "status": "ok"
     },
@@ -408,19 +486,6 @@
       "status": "ok"
     },
     {
-      "name": "robinson_DB_1000",
-      "lat": 37.4671,
-      "lon": -83.1576,
-      "year": 2023,
-      "metadata": {
-        "year": 2023,
-        "phenophase_gap_days": 40.0,
-        "dtw_per_step": 0.036,
-        "divergence_score": 2.8931
-      },
-      "status": "ok"
-    },
-    {
       "name": "rosalia_EN_1000",
       "lat": 47.7027,
       "lon": 16.3015,
@@ -430,6 +495,19 @@
         "phenophase_gap_days": 60.5,
         "dtw_per_step": 0.1075,
         "divergence_score": 4.4289
+      },
+      "status": "ok"
+    },
+    {
+      "name": "sevilletanewgrass_GR_1000",
+      "lat": 34.358,
+      "lon": -106.6799,
+      "year": 2023,
+      "metadata": {
+        "year": 2023,
+        "phenophase_gap_days": 6.0,
+        "dtw_per_step": 0.0627,
+        "divergence_score": 0.4913
       },
       "status": "ok"
     },

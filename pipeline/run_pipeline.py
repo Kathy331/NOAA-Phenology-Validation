@@ -80,7 +80,9 @@ def combine(entries: list[dict], step1_results: list[dict], step2_results: list[
 				"spatial": {
 					"cv_ndvi": s1.get("cv_ndvi"),
 					"water_pct": s1.get("water_pct"),
+					"bare_pct": s1.get("bare_pct"),
 					"urban_pct": s1.get("urban_pct"),
+					"nonveg_pct": s1.get("nonveg_pct"),
 					"summer_doy": s1.get("summer_doy"),
 					"n_images": s1.get("n_images"),
 				},
@@ -120,7 +122,7 @@ def main() -> dict:
 		"thresholds": {
 			"cv_max": config.CV_MAX,
 			"water_max": config.WATER_MAX,
-			"urban_max": config.URBAN_MAX,
+			"nonveg_max": config.NONVEG_MAX,
 		},
 		"sites": combined,
 	}

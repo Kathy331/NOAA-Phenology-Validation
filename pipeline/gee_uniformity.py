@@ -1,10 +1,20 @@
 """Earth Engine helpers for Step 1 spatial-uniformity screening.
 
 Ports the index math from test/GEE/calcu_uniform.js to headless Python:
-  - NDVI  = normalizedDifference(['B8','B4'])
-  - MNDWI = normalizedDifference(['B3','B11']); water where MNDWI > 0
-  - NDBI  = normalizedDifference(['B11','B8']); urban where NDBI > 0
+  - NDVI = normalizedDifference(['B8','B4']) on a peak-summer Sentinel-2 composite
   - spatial CV = stdDev(NDVI) / mean(NDVI) over the box (single peak-summer composite)
+
+Surface type (water / bare / urban) no longer comes from self-computed MNDWI/NDBI
+thresholds. Those indices can't cleanly separate bare soil from built-up land (both
+are bright in SWIR, dark in NIR), so ambiguous pixels leaked into the wrong mask.
+Instead we read the pre-classified ESA WorldCover v200 map, where each pixel already
+has exactly one class:
+  10 Trees | 20 Shrubland | 30 Grassland | 40 Cropland | 50 Built-up |
+  60 Bare/sparse vegetation | 70 Snow/ice | 80 Water | 90 Wetland |
+  95 Mangroves | 100 Moss/lichen
+  -> water = class 80, bare = class 60, urban/built-up = class 50.
+Trade-off: WorldCover is a static 2020/2021 snapshot, not computed live per YEAR, so
+it won't reflect land changed after that.
 
 `init_ee()` initializes Earth Engine, falling back to a one-time localhost auth if
 no cached credentials exist.
@@ -15,6 +25,16 @@ import ee
 import config
 
 _initialized = False
+
+# ESA WorldCover class codes used for the surface-type flags.
+WC_WATER = 80
+WC_BARE = 60
+WC_URBAN = 50
+
+
+def worldcover_map() -> "ee.Image":
+	"""Single-band ESA WorldCover v200 classification map ('Map' band)."""
+	return ee.ImageCollection("ESA/WorldCover/v200").first().select("Map")
 
 
 def init_ee() -> None:
@@ -52,14 +72,19 @@ def ndvi_of(s2: "ee.Image") -> "ee.Image":
 	return s2.normalizedDifference(["B8", "B4"]).rename("NDVI")
 
 
-def water_mask(s2: "ee.Image") -> "ee.Image":
-	"""Binary water mask from MNDWI = (B3 - B11)/(B3 + B11) > 0."""
-	return s2.normalizedDifference(["B3", "B11"]).gt(0.0).rename("water")
+def water_mask(worldcover: "ee.Image") -> "ee.Image":
+	"""Binary water mask from ESA WorldCover (class 80)."""
+	return worldcover.eq(WC_WATER).rename("water")
 
 
-def urban_mask(s2: "ee.Image") -> "ee.Image":
-	"""Binary urban mask from NDBI = (B11 - B8)/(B11 + B8) > 0."""
-	return s2.normalizedDifference(["B11", "B8"]).gt(0.0).rename("urban")
+def bare_mask(worldcover: "ee.Image") -> "ee.Image":
+	"""Binary bare/sparse-vegetation mask from ESA WorldCover (class 60)."""
+	return worldcover.eq(WC_BARE).rename("bare")
+
+
+def urban_mask(worldcover: "ee.Image") -> "ee.Image":
+	"""Binary built-up mask from ESA WorldCover (class 50)."""
+	return worldcover.eq(WC_URBAN).rename("urban")
 
 
 def ndvi_cv(ndvi_image: "ee.Image", box: "ee.Geometry", scale: int = config.NDVI_SCALE_M) -> "ee.Number":
@@ -89,30 +114,46 @@ def mask_fraction(mask_image: "ee.Image", box: "ee.Geometry", scale: int = confi
 def summer_metrics(point: "ee.Geometry", box: "ee.Geometry", start: str, end: str) -> "ee.Dictionary":
 	"""All Step 1 numbers for one site-year as a single server-side dictionary.
 
-	Bundles the image count and one combined reduceRegion (NDVI mean+stdDev, plus
-	the water/urban mask means) so the whole site needs just one `.getInfo()`
-	round-trip instead of four. Values are null when the composite is empty.
+	Bundles two reduceRegions into one `.getInfo()` round-trip:
+	  - NDVI mean+stdDev from the peak-summer Sentinel-2 composite (null when the
+	    composite is empty), and
+	  - water/bare/urban pixel fractions from the static ESA WorldCover map.
+	WorldCover is independent of the cloud window, so those fractions are returned
+	even if no cloud-free scene is found.
 	"""
 	collection = summer_collection(point, start, end)
 	composite = collection.median()
 
-	stacked = (
+	ndvi_stats = (
 		composite.normalizedDifference(["B8", "B4"]).rename("NDVI")
-		.addBands(composite.normalizedDifference(["B3", "B11"]).gt(0.0).rename("water"))
-		.addBands(composite.normalizedDifference(["B11", "B8"]).gt(0.0).rename("urban"))
+		.reduceRegion(
+			reducer=ee.Reducer.mean().combine(reducer2=ee.Reducer.stdDev(), sharedInputs=True),
+			geometry=box,
+			scale=config.NDVI_SCALE_M,
+			maxPixels=int(1e9),
+		)
 	)
-	stats = stacked.reduceRegion(
-		reducer=ee.Reducer.mean().combine(reducer2=ee.Reducer.stdDev(), sharedInputs=True),
+
+	worldcover = worldcover_map()
+	surface = (
+		water_mask(worldcover)
+		.addBands(bare_mask(worldcover))
+		.addBands(urban_mask(worldcover))
+	)
+	surface_stats = surface.reduceRegion(
+		reducer=ee.Reducer.mean(),
 		geometry=box,
 		scale=config.NDVI_SCALE_M,
 		maxPixels=int(1e9),
 	)
+
 	return ee.Dictionary(
 		{
 			"n_images": collection.size(),
-			"ndvi_mean": stats.get("NDVI_mean"),
-			"ndvi_std": stats.get("NDVI_stdDev"),
-			"water_pct": stats.get("water_mean"),
-			"urban_pct": stats.get("urban_mean"),
+			"ndvi_mean": ndvi_stats.get("NDVI_mean"),
+			"ndvi_std": ndvi_stats.get("NDVI_stdDev"),
+			"water_pct": surface_stats.get("water"),
+			"bare_pct": surface_stats.get("bare"),
+			"urban_pct": surface_stats.get("urban"),
 		}
 	)

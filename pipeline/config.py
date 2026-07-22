@@ -12,7 +12,14 @@ from dotenv import find_dotenv, load_dotenv
 # Inputs / outputs
 BASE_DIR = Path(__file__).resolve().parent
 INPUT_DIR = BASE_DIR / "input"
-OUTPUT_DIR = BASE_DIR / "output"
+# PIPELINE_OUTDIR=<relative or absolute path> redirects all outputs (e.g. to
+# output/Full or output/GBOV). Defaults to pipeline/output.
+_outdir_env = os.environ.get("PIPELINE_OUTDIR")
+if _outdir_env:
+	_outdir_path = Path(_outdir_env)
+	OUTPUT_DIR = _outdir_path if _outdir_path.is_absolute() else BASE_DIR / _outdir_path
+else:
+	OUTPUT_DIR = BASE_DIR / "output"
 
 # pre-computed site metadata (name/lat/lon/year + phenology scores)
 # Step 1 reads lat/lon here and Step 2 reuses the cached NDVI vs GCC scores
@@ -29,10 +36,15 @@ STEP1_JSON = OUTPUT_DIR / f"step1_uniformity{_suffix}.json"
 STEP2_JSON = OUTPUT_DIR / f"step2_phenology{_suffix}.json"
 RESULTS_JSON = OUTPUT_DIR / f"pipeline_results{_suffix}.json"
 
-# Step 1 pass/fail thresholds (spatial uniformity)
-CV_MAX = 0.1      
-WATER_MAX = 0.05  
-URBAN_MAX = 0.05  
+# Step 1 pass/fail thresholds (spatial uniformity). Surface fractions come from the
+# ESA WorldCover classification (water=80, bare=60, urban/built-up=50).
+# Each can be overridden with an env var (CV_MAX / WATER_MAX / NONVEG_MAX) for
+# quick threshold sweeps without editing this file.
+CV_MAX = float(os.environ.get("CV_MAX", 0.1))         # peak-summer NDVI coefficient of variation
+WATER_MAX = float(os.environ.get("WATER_MAX", 0.05))  # max fraction of water pixels in the box
+# Gate on the combined non-vegetated fraction (built-up + bare) rather than urban
+# alone, so bare desert/soil footprints are still screened out.
+NONVEG_MAX = float(os.environ.get("NONVEG_MAX", 0.05))  # max fraction of (urban + bare) pixels
 
 # Earth Engine / Sentinel-2 parameters
 CLOUD_PCT = 5             # keep scenes with CLOUDY_PIXEL_PERCENTAGE below this

@@ -1,0 +1,379 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Golden validation sites (pipeline_results)</title>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+  <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.css">
+  <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.Default.css">
+  <style>
+    :root {
+      color-scheme: light;
+      --panel: rgba(255, 255, 255, 0.94);
+      --ink: #1f2933;
+      --muted: #5b6770;
+      --accent: #ad5a1f;
+      --border: rgba(31, 41, 51, 0.12);
+    }
+    html, body { height: 100%; margin: 0; }
+    body {
+      font-family: Georgia, "Times New Roman", serif;
+      background: linear-gradient(180deg, #efe6d7 0%, #f8f5ef 40%, #f5f1e8 100%);
+      color: var(--ink);
+    }
+    .frame { position: relative; width: 100%; height: 100%; }
+    #map { width: 100%; height: 100%; }
+    .legend {
+      position: absolute;
+      bottom: 16px;
+      left: 16px;
+      z-index: 1000;
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      box-shadow: 0 10px 28px rgba(31, 41, 51, 0.12);
+      padding: 10px 12px;
+      font-size: 13px;
+      max-width: min(360px, calc(100vw - 32px));
+    }
+    .legend strong { display: block; margin-bottom: 4px; }
+    .swatch {
+      display: inline-block;
+      width: 12px;
+      height: 12px;
+      border-radius: 999px;
+      margin-right: 8px;
+      vertical-align: middle;
+      background: var(--accent);
+    }
+  </style>
+</head>
+<body>
+  <div class="frame">
+    <div id="map"></div>
+    <div class="legend">
+      <strong>Map key</strong>
+      <div><span class="swatch"></span>golden site pin</div>
+      <div>Golden sites only: isolated within 4 km and inside the USA.</div>
+    </div>
+  </div>
+
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script src="https://unpkg.com/leaflet.markercluster@1.5.3/dist/leaflet.markercluster.js"></script>
+  <script>
+    const points = [
+  {
+    "lat": 46.7614,
+    "lon": -100.9257,
+    "popup": "<strong>mandani2_AG_1000</strong><br>Year: 2023<br>Status: ok<br>Divergence: 0.368<br>NDVI CV: 0.188<br>Water%: 0.001<br>Urban%: 0.008<br>Bare%: 0.001<br>Non-veg%: 0.008",
+    "name": "mandani2_AG_1000",
+    "year": 2023,
+    "divergence": 0.3685,
+    "cv_ndvi": 0.1883
+  },
+  {
+    "lat": 64.9194,
+    "lon": -147.822,
+    "popup": "<strong>bigtraillake_EN_1000</strong><br>Year: 2023<br>Status: ok<br>Divergence: 0.398<br>NDVI CV: 0.116<br>Water%: 0.010<br>Urban%: 0.003<br>Bare%: 0.000<br>Non-veg%: 0.003",
+    "name": "bigtraillake_EN_1000",
+    "year": 2023,
+    "divergence": 0.3978,
+    "cv_ndvi": 0.1164
+  },
+  {
+    "lat": 33.6216,
+    "lon": -91.4306,
+    "popup": "<strong>arkansaswhitaker_AG_1000</strong><br>Year: 2023<br>Status: ok<br>Divergence: 0.507<br>NDVI CV: 0.172<br>Water%: 0.000<br>Urban%: 0.008<br>Bare%: 0.001<br>Non-veg%: 0.009",
+    "name": "arkansaswhitaker_AG_1000",
+    "year": 2023,
+    "divergence": 0.5068,
+    "cv_ndvi": 0.1718
+  },
+  {
+    "lat": 38.892925,
+    "lon": -78.139494,
+    "popup": "<strong>NEON.D02.SCBI.DP1.00033_DB_1000</strong><br>Year: 2023<br>Status: ok<br>Divergence: 0.574<br>NDVI CV: 0.130<br>Water%: 0.002<br>Urban%: 0.007<br>Bare%: 0.000<br>Non-veg%: 0.007",
+    "name": "NEON.D02.SCBI.DP1.00033_DB_1000",
+    "year": 2023,
+    "divergence": 0.574,
+    "cv_ndvi": 0.1301
+  },
+  {
+    "lat": 52.8067,
+    "lon": 12.8404,
+    "popup": "<strong>hakenberg_WL_1000</strong><br>Year: 2024<br>Status: ok<br>Divergence: 0.767<br>NDVI CV: 0.154<br>Water%: 0.001<br>Urban%: 0.002<br>Bare%: 0.000<br>Non-veg%: 0.002",
+    "name": "hakenberg_WL_1000",
+    "year": 2024,
+    "divergence": 0.7669,
+    "cv_ndvi": 0.1536
+  },
+  {
+    "lat": 35.973583,
+    "lon": -79.100371,
+    "popup": "<strong>dukehw_DB_1000</strong><br>Year: 2023<br>Status: ok<br>Divergence: 0.891<br>NDVI CV: 0.190<br>Water%: 0.002<br>Urban%: 0.015<br>Bare%: 0.001<br>Non-veg%: 0.016",
+    "name": "dukehw_DB_1000",
+    "year": 2023,
+    "divergence": 0.8912,
+    "cv_ndvi": 0.1904
+  },
+  {
+    "lat": 68.669753,
+    "lon": -149.143018,
+    "popup": "<strong>NEON.D18.OKSR.DP1.20002_TN_1000</strong><br>Year: 2024<br>Status: ok<br>Divergence: 0.950<br>NDVI CV: 0.115<br>Water%: 0.002<br>Urban%: 0.000<br>Bare%: 0.000<br>Non-veg%: 0.000",
+    "name": "NEON.D18.OKSR.DP1.20002_TN_1000",
+    "year": 2024,
+    "divergence": 0.9496,
+    "cv_ndvi": 0.1153
+  },
+  {
+    "lat": 42.4484,
+    "lon": -72.6804,
+    "popup": "<strong>macleish_DB_1000</strong><br>Year: 2023<br>Status: ok<br>Divergence: 0.994<br>NDVI CV: 0.114<br>Water%: 0.018<br>Urban%: 0.001<br>Bare%: 0.000<br>Non-veg%: 0.001",
+    "name": "macleish_DB_1000",
+    "year": 2023,
+    "divergence": 0.9938,
+    "cv_ndvi": 0.1143
+  },
+  {
+    "lat": 37.4671,
+    "lon": -83.1576,
+    "popup": "<strong>robinson2_DB_1000</strong><br>Year: 2023<br>Status: ok<br>Divergence: 1.036<br>NDVI CV: 0.055<br>Water%: 0.001<br>Urban%: 0.001<br>Bare%: 0.000<br>Non-veg%: 0.001",
+    "name": "robinson2_DB_1000",
+    "year": 2023,
+    "divergence": 1.0358,
+    "cv_ndvi": 0.0551
+  },
+  {
+    "lat": 45.627,
+    "lon": -96.127,
+    "popup": "<strong>arsmorris2_AG_1000</strong><br>Year: 2024<br>Status: ok<br>Divergence: 1.136<br>NDVI CV: 0.195<br>Water%: 0.002<br>Urban%: 0.011<br>Bare%: 0.000<br>Non-veg%: 0.011",
+    "name": "arsmorris2_AG_1000",
+    "year": 2024,
+    "divergence": 1.1361,
+    "cv_ndvi": 0.1951
+  },
+  {
+    "lat": 46.78152,
+    "lon": -117.0821,
+    "popup": "<strong>cafcookeastltar01_AG_1000</strong><br>Year: 2023<br>Status: ok<br>Divergence: 1.139<br>NDVI CV: 0.197<br>Water%: 0.000<br>Urban%: 0.001<br>Bare%: 0.000<br>Non-veg%: 0.001",
+    "name": "cafcookeastltar01_AG_1000",
+    "year": 2023,
+    "divergence": 1.1392,
+    "cv_ndvi": 0.1965
+  },
+  {
+    "lat": 34.444218,
+    "lon": -96.624201,
+    "popup": "<strong>NEON.D11.BLUE.DP1.20002_DB_1000</strong><br>Year: 2023<br>Status: ok<br>Divergence: 1.147<br>NDVI CV: 0.196<br>Water%: 0.004<br>Urban%: 0.009<br>Bare%: 0.001<br>Non-veg%: 0.009",
+    "name": "NEON.D11.BLUE.DP1.20002_DB_1000",
+    "year": 2023,
+    "divergence": 1.1475,
+    "cv_ndvi": 0.1963
+  },
+  {
+    "lat": 34.5163,
+    "lon": -120.458,
+    "popup": "<strong>dangermondjalama_GR_1000</strong><br>Year: 2024<br>Status: ok<br>Divergence: 1.188<br>NDVI CV: 0.131<br>Water%: 0.000<br>Urban%: 0.001<br>Bare%: 0.000<br>Non-veg%: 0.001",
+    "name": "dangermondjalama_GR_1000",
+    "year": 2024,
+    "divergence": 1.1883,
+    "cv_ndvi": 0.1312
+  },
+  {
+    "lat": 53.876,
+    "lon": 12.8891,
+    "popup": "<strong>zarnekow1_WL_1000</strong><br>Year: 2023<br>Status: ok<br>Divergence: 1.271<br>NDVI CV: 0.187<br>Water%: 0.010<br>Urban%: 0.007<br>Bare%: 0.000<br>Non-veg%: 0.007",
+    "name": "zarnekow1_WL_1000",
+    "year": 2023,
+    "divergence": 1.2707,
+    "cv_ndvi": 0.1866
+  },
+  {
+    "lat": 19.9322,
+    "lon": -155.2912,
+    "popup": "<strong>laupahoehoe_EB_1000</strong><br>Year: 2023<br>Status: ok<br>Divergence: 1.621<br>NDVI CV: 0.051<br>Water%: 0.000<br>Urban%: 0.000<br>Bare%: 0.000<br>Non-veg%: 0.000",
+    "name": "laupahoehoe_EB_1000",
+    "year": 2023,
+    "divergence": 1.6205,
+    "cv_ndvi": 0.0506
+  },
+  {
+    "lat": 52.176,
+    "lon": 6.955,
+    "popup": "<strong>amtsvenn_SH_1000</strong><br>Year: 2023<br>Status: ok<br>Divergence: 1.715<br>NDVI CV: 0.169<br>Water%: 0.005<br>Urban%: 0.010<br>Bare%: 0.000<br>Non-veg%: 0.010",
+    "name": "amtsvenn_SH_1000",
+    "year": 2023,
+    "divergence": 1.7154,
+    "cv_ndvi": 0.1691
+  },
+  {
+    "lat": 45.5432,
+    "lon": 13.9162,
+    "popup": "<strong>slovenia2karstsecforest_DB_1000</strong><br>Year: 2023<br>Status: ok<br>Divergence: 1.804<br>NDVI CV: 0.165<br>Water%: 0.000<br>Urban%: 0.008<br>Bare%: 0.000<br>Non-veg%: 0.008",
+    "name": "slovenia2karstsecforest_DB_1000",
+    "year": 2023,
+    "divergence": 1.8036,
+    "cv_ndvi": 0.1649
+  },
+  {
+    "lat": 36.6081,
+    "lon": -112.4082,
+    "popup": "<strong>segawhitepockets_GR_1000</strong><br>Year: 2023<br>Status: ok<br>Divergence: 1.844<br>NDVI CV: 0.160<br>Water%: 0.000<br>Urban%: 0.000<br>Bare%: 0.000<br>Non-veg%: 0.000",
+    "name": "segawhitepockets_GR_1000",
+    "year": 2023,
+    "divergence": 1.8443,
+    "cv_ndvi": 0.1601
+  },
+  {
+    "lat": 39.3231,
+    "lon": -86.4131,
+    "popup": "<strong>morganmonroe2_DB_1000</strong><br>Year: 2023<br>Status: ok<br>Divergence: 1.911<br>NDVI CV: 0.057<br>Water%: 0.000<br>Urban%: 0.002<br>Bare%: 0.000<br>Non-veg%: 0.002",
+    "name": "morganmonroe2_DB_1000",
+    "year": 2023,
+    "divergence": 1.9111,
+    "cv_ndvi": 0.0567
+  },
+  {
+    "lat": 40.86801886,
+    "lon": -96.822080664,
+    "popup": "<strong>ninemileprairie_DB_2000</strong><br>Year: 2023<br>Status: ok<br>Divergence: 2.008<br>NDVI CV: 0.197<br>Water%: 0.003<br>Urban%: 0.010<br>Bare%: 0.001<br>Non-veg%: 0.011",
+    "name": "ninemileprairie_DB_2000",
+    "year": 2023,
+    "divergence": 2.0082,
+    "cv_ndvi": 0.1965
+  },
+  {
+    "lat": 46.0827,
+    "lon": -89.9792,
+    "popup": "<strong>lostcreek_WL_1000</strong><br>Year: 2024<br>Status: ok<br>Divergence: 2.043<br>NDVI CV: 0.093<br>Water%: 0.008<br>Urban%: 0.002<br>Bare%: 0.000<br>Non-veg%: 0.002",
+    "name": "lostcreek_WL_1000",
+    "year": 2024,
+    "divergence": 2.0429,
+    "cv_ndvi": 0.0931
+  },
+  {
+    "lat": 37.57341,
+    "lon": -79.08482,
+    "popup": "<strong>sweetbriar_DB_1000</strong><br>Year: 2023<br>Status: ok<br>Divergence: 2.437<br>NDVI CV: 0.193<br>Water%: 0.003<br>Urban%: 0.012<br>Bare%: 0.000<br>Non-veg%: 0.012",
+    "name": "sweetbriar_DB_1000",
+    "year": 2023,
+    "divergence": 2.437,
+    "cv_ndvi": 0.1927
+  },
+  {
+    "lat": 32.456961,
+    "lon": -91.974322,
+    "popup": "<strong>russellsage_DB_1000</strong><br>Year: 2024<br>Status: ok<br>Divergence: 2.728<br>NDVI CV: 0.199<br>Water%: 0.002<br>Urban%: 0.000<br>Bare%: 0.000<br>Non-veg%: 0.000",
+    "name": "russellsage_DB_1000",
+    "year": 2024,
+    "divergence": 2.7282,
+    "cv_ndvi": 0.1986
+  },
+  {
+    "lat": 45.50894,
+    "lon": -89.58637,
+    "popup": "<strong>NEON.D05.STEI.DP1.00042_UN_1000</strong><br>Year: 2024<br>Status: ok<br>Divergence: 3.066<br>NDVI CV: 0.159<br>Water%: 0.030<br>Urban%: 0.003<br>Bare%: 0.002<br>Non-veg%: 0.005",
+    "name": "NEON.D05.STEI.DP1.00042_UN_1000",
+    "year": 2024,
+    "divergence": 3.0656,
+    "cv_ndvi": 0.1588
+  },
+  {
+    "lat": 34.3104,
+    "lon": -106.6844,
+    "popup": "<strong>sevmettswl_SH_1000</strong><br>Year: 2024<br>Status: ok<br>Divergence: 3.111<br>NDVI CV: 0.154<br>Water%: 0.000<br>Urban%: 0.000<br>Bare%: 0.042<br>Non-veg%: 0.042",
+    "name": "sevmettswl_SH_1000",
+    "year": 2024,
+    "divergence": 3.1107,
+    "cv_ndvi": 0.1537
+  },
+  {
+    "lat": 43.7343,
+    "lon": -96.6234,
+    "popup": "<strong>usgseros_DB_2000</strong><br>Year: 2023<br>Status: ok<br>Divergence: 3.681<br>NDVI CV: 0.181<br>Water%: 0.003<br>Urban%: 0.009<br>Bare%: 0.001<br>Non-veg%: 0.010",
+    "name": "usgseros_DB_2000",
+    "year": 2023,
+    "divergence": 3.6809,
+    "cv_ndvi": 0.1806
+  },
+  {
+    "lat": 48.2685,
+    "lon": 7.8782,
+    "popup": "<strong>ettenheim1_EN_1000</strong><br>Year: 2024<br>Status: ok<br>Divergence: 4.347<br>NDVI CV: 0.126<br>Water%: 0.000<br>Urban%: 0.030<br>Bare%: 0.000<br>Non-veg%: 0.030",
+    "name": "ettenheim1_EN_1000",
+    "year": 2024,
+    "divergence": 4.3474,
+    "cv_ndvi": 0.1255
+  },
+  {
+    "lat": 51.765,
+    "lon": 10.518,
+    "popup": "<strong>somo_WL_1000</strong><br>Year: 2024<br>Status: ok<br>Divergence: 4.917<br>NDVI CV: 0.165<br>Water%: 0.015<br>Urban%: 0.004<br>Bare%: 0.000<br>Non-veg%: 0.004",
+    "name": "somo_WL_1000",
+    "year": 2024,
+    "divergence": 4.9172,
+    "cv_ndvi": 0.1645
+  },
+  {
+    "lat": 41.1796,
+    "lon": -83.0604,
+    "popup": "<strong>ecb4_AG_1000</strong><br>Year: 2023<br>Status: ok<br>Divergence: 5.153<br>NDVI CV: 0.143<br>Water%: 0.004<br>Urban%: 0.007<br>Bare%: 0.000<br>Non-veg%: 0.007",
+    "name": "ecb4_AG_1000",
+    "year": 2023,
+    "divergence": 5.1532,
+    "cv_ndvi": 0.1434
+  },
+  {
+    "lat": 42.6353,
+    "lon": -80.5576,
+    "popup": "<strong>turkeypointdbf_DB_2000</strong><br>Year: 2023<br>Status: ok<br>Divergence: 5.978<br>NDVI CV: 0.126<br>Water%: 0.002<br>Urban%: 0.002<br>Bare%: 0.000<br>Non-veg%: 0.002",
+    "name": "turkeypointdbf_DB_2000",
+    "year": 2023,
+    "divergence": 5.978,
+    "cv_ndvi": 0.1258
+  },
+  {
+    "lat": 31.743896,
+    "lon": -110.052023,
+    "popup": "<strong>luckyhills_SH_4000</strong><br>Year: 2024<br>Status: ok<br>Divergence: 6.620<br>NDVI CV: 0.171<br>Water%: 0.000<br>Urban%: 0.014<br>Bare%: 0.026<br>Non-veg%: 0.040",
+    "name": "luckyhills_SH_4000",
+    "year": 2024,
+    "divergence": 6.6196,
+    "cv_ndvi": 0.171
+  },
+  {
+    "lat": 31.9385,
+    "lon": -109.0823,
+    "popup": "<strong>portal_SH_1000</strong><br>Year: 2024<br>Status: ok<br>Divergence: 8.030<br>NDVI CV: 0.150<br>Water%: 0.000<br>Urban%: 0.000<br>Bare%: 0.008<br>Non-veg%: 0.008",
+    "name": "portal_SH_1000",
+    "year": 2024,
+    "divergence": 8.0304,
+    "cv_ndvi": 0.1496
+  }
+];
+    const map = L.map('map', { preferCanvas: true });
+
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      maxZoom: 18,
+      attribution: '&copy; OpenStreetMap contributors'
+    }).addTo(map);
+
+    const markers = L.markerClusterGroup({ chunkedLoading: true });
+    const bounds = [];
+
+    for (const point of points) {
+      const marker = L.marker([point.lat, point.lon]);
+      marker.bindPopup(point.popup, { maxWidth: 320 });
+      markers.addLayer(marker);
+      bounds.push([point.lat, point.lon]);
+    }
+
+    map.addLayer(markers);
+    map.fitBounds(bounds, { padding: [40, 40] });
+    if (!bounds.length) {
+      map.setView([42.451688276875004, -79.8535312395], 2);
+    }
+  </script>
+</body>
+</html>

@@ -4,7 +4,10 @@ For each site-year, find a cloud-free Sentinel-2 composite from the middle of th
 growing season (midpoint of the cached NDVI MOS..DOS dates, with a hemisphere
 fallback), then measure how uniform peak-summer NDVI is inside a ~4 km box:
 
-    passed = NDVI CV < CV_MAX  AND  water% < WATER_MAX  AND  urban% < URBAN_MAX
+    passed = NDVI CV < CV_MAX  AND  water% < WATER_MAX  AND  (urban% + bare%) < NONVEG_MAX
+
+Surface fractions (water/bare/urban) are read from the ESA WorldCover map, and the
+gate uses the combined non-vegetated fraction (built-up + bare).
 
 The MOS/DOS dates come pre-computed from site_metadata_clean.json, so no PhenoCam
 call is made here. Results (every evaluated site) are written to
@@ -74,7 +77,9 @@ def evaluate_site(entry: dict) -> dict:
 		"n_images": None,
 		"cv_ndvi": None,
 		"water_pct": None,
+		"bare_pct": None,
 		"urban_pct": None,
+		"nonveg_pct": None,
 		"passed": False,
 		"status": "ok",
 	}
@@ -111,18 +116,21 @@ def evaluate_site(entry: dict) -> dict:
 			return result
 
 		ndvi_mean, ndvi_std = info.get("ndvi_mean"), info.get("ndvi_std")
-		water, urban = info.get("water_pct"), info.get("urban_pct")
+		water, bare, urban = info.get("water_pct"), info.get("bare_pct"), info.get("urban_pct")
 		cv = ndvi_std / ndvi_mean if (ndvi_mean not in (None, 0) and ndvi_std is not None) else None
+		nonveg = (urban + bare) if (urban is not None and bare is not None) else None
 		result["cv_ndvi"] = _round(cv)
 		result["water_pct"] = _round(water)
+		result["bare_pct"] = _round(bare)
 		result["urban_pct"] = _round(urban)
+		result["nonveg_pct"] = _round(nonveg)
 
-		if cv is None or water is None or urban is None:
+		if cv is None or water is None or nonveg is None:
 			result["status"] = "no_valid_pixels"
 			return result
 
 		result["passed"] = bool(
-			cv < config.CV_MAX and water < config.WATER_MAX and urban < config.URBAN_MAX
+			cv < config.CV_MAX and water < config.WATER_MAX and nonveg < config.NONVEG_MAX
 		)
 	except Exception as error:  # noqa: BLE001 - record any per-site failure, keep going
 		result["status"] = f"error: {error}"
@@ -147,8 +155,9 @@ def run_step1(entries: list[dict]) -> list[dict]:
 		"thresholds": {
 			"cv_max": config.CV_MAX,
 			"water_max": config.WATER_MAX,
-			"urban_max": config.URBAN_MAX,
+			"nonveg_max": config.NONVEG_MAX,
 		},
+		"surface_source": "ESA/WorldCover/v200",
 		"params": {
 			"cloud_pct": config.CLOUD_PCT,
 			"box_radius_m": config.BOX_RADIUS_M,

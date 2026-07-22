@@ -1,14 +1,14 @@
 {
   "counts": {
     "evaluated": 21,
-    "step1_passed": 2,
-    "step2_scored": 2,
+    "step1_passed": 3,
+    "step2_scored": 3,
     "missing_latlon": 0
   },
   "thresholds": {
     "cv_max": 0.1,
     "water_max": 0.05,
-    "urban_max": 0.05
+    "nonveg_max": 0.05
   },
   "sites": [
     {
@@ -18,8 +18,10 @@
       "year": 2024,
       "spatial": {
         "cv_ndvi": 0.0756,
-        "water_pct": 0.0,
-        "urban_pct": 0.0029,
+        "water_pct": 0.0005,
+        "bare_pct": 0.0,
+        "urban_pct": 0.0031,
+        "nonveg_pct": 0.0031,
         "summer_doy": 196,
         "n_images": 2
       },
@@ -38,8 +40,10 @@
       "year": 2023,
       "spatial": {
         "cv_ndvi": 0.0829,
-        "water_pct": 0.0,
-        "urban_pct": 0.0033,
+        "water_pct": 0.0002,
+        "bare_pct": 0.0,
+        "urban_pct": 0.0001,
+        "nonveg_pct": 0.0001,
         "summer_doy": 248,
         "n_images": 2
       },
@@ -48,6 +52,28 @@
         "phenophase_gap_days": 19.5,
         "dtw_per_step": 0.0838,
         "divergence_score": 1.4767
+      },
+      "status": "ok"
+    },
+    {
+      "name": "NEON.D14.JORN.DP1.00033_GR_1000",
+      "lat": 32.59068,
+      "lon": -106.84254,
+      "year": 2024,
+      "spatial": {
+        "cv_ndvi": 0.0681,
+        "water_pct": 0.0,
+        "bare_pct": 0.002,
+        "urban_pct": 0.0,
+        "nonveg_pct": 0.002,
+        "summer_doy": 110,
+        "n_images": 12
+      },
+      "phenology": {
+        "year": 2024,
+        "phenophase_gap_days": 51.0,
+        "dtw_per_step": 0.0926,
+        "divergence_score": 3.7354
       },
       "status": "ok"
     }

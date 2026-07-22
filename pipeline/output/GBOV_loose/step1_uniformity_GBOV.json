@@ -1,8 +1,8 @@
 {
   "thresholds": {
-    "cv_max": 0.1,
-    "water_max": 0.05,
-    "nonveg_max": 0.05
+    "cv_max": 0.2,
+    "water_max": 0.1,
+    "nonveg_max": 0.1
   },
   "surface_source": "ESA/WorldCover/v200",
   "params": {
@@ -13,7 +13,7 @@
   },
   "counts": {
     "evaluated": 21,
-    "passed": 3
+    "passed": 9
   },
   "sites": [
     {
@@ -33,7 +33,7 @@
       "bare_pct": 0.0066,
       "urban_pct": 0.0113,
       "nonveg_pct": 0.0178,
-      "passed": false,
+      "passed": true,
       "status": "ok"
     },
     {
@@ -53,7 +53,7 @@
       "bare_pct": 0.0066,
       "urban_pct": 0.0113,
       "nonveg_pct": 0.0178,
-      "passed": false,
+      "passed": true,
       "status": "ok"
     },
     {
@@ -73,7 +73,7 @@
       "bare_pct": 0.0,
       "urban_pct": 0.0031,
       "nonveg_pct": 0.0031,
-      "passed": false,
+      "passed": true,
       "status": "ok"
     },
     {
@@ -270,7 +270,7 @@
       "bare_pct": 0.0001,
       "urban_pct": 0.0001,
       "nonveg_pct": 0.0002,
-      "passed": false,
+      "passed": true,
       "status": "ok"
     },
     {
@@ -290,7 +290,7 @@
       "bare_pct": 0.0001,
       "urban_pct": 0.0001,
       "nonveg_pct": 0.0002,
-      "passed": false,
+      "passed": true,
       "status": "ok"
     },
     {
@@ -390,7 +390,7 @@
       "bare_pct": 0.0143,
       "urban_pct": 0.0031,
       "nonveg_pct": 0.0174,
-      "passed": false,
+      "passed": true,
       "status": "ok"
     },
     {
