@@ -6,6 +6,9 @@ __pycache__/
 prep/output/api/*
 !prep/output/api/.gitkeep
 
+#validation stage plots (regenerated from the input JSONs); keep input JSONs
+validation_pipeline/output/
+
 
 #personal notes
 local_notes/

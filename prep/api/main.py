@@ -9,6 +9,8 @@
   - build_gbov_metadata(): same scoring but only for the NEON/GBOV sites listed in
     doc/PhenoCam GBOV sites.xlsx, saved (clean style) to site_GBOV_clean.json.
   - plot_site(name, year): saves one site's NDVI/GCC time series plot.
+  - plot_from_results(json): plots every site-year in a pipeline results / step2
+    JSON (re-fetches the curves from PhenoCam, reuses the cached scores).
 
 Run with:  python3 prep/api/main.py
 """
@@ -28,8 +30,8 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 
 from shared.DynamicTimeWrap import _fetch_timeseries, _jsonable, site_agreement_score
 from shared.PhenoloDates import compute_phases
-from shared.phenocam_api import fetch_ndvi_3day_for_roi, find_roi, list_rois, load_timeseries, roi_ndvi_3day_url
-from shared.plotting import create_plot, save_plot
+from shared.phenocam_api import list_rois
+from shared.plot_json import plot_from_results as _plot_from_results, plot_one
 
 MAX_WORKERS = 20
 
@@ -386,41 +388,26 @@ def top_sites(
 	return result
 
 
-def resolve_roi(name: str, rois: list[dict] | None = None) -> dict:
-	"""Resolve a roi_name (e.g. site_EN_1001) or bare site name to its ROI record."""
-	rois = rois if rois is not None else list_rois()
-	for roi in rois:
-		if roi["roi_name"] == name:
-			return roi
-	return find_roi(name, rois=rois)
-
-
 def plot_site(name: str, year: int, output_dir: Path = OUTPUT_DIR) -> Path:
 	"""Save the NDVI/GCC time series plot for one site and year to output/api.
 
 	`name` may be a full roi_name (site_VEG_ROI) or a bare site name. Returns the
-	path of the written PNG.
+	path of the written PNG. Thin wrapper over shared.plot_json.plot_one.
 	"""
-	roi = resolve_roi(name)
-	timeseries = load_timeseries(fetch_ndvi_3day_for_roi(roi))
+	return plot_one(name, year, output_dir)
 
-	available = {int(y) for y in timeseries["year"].dropna().unique()}
-	if year not in available:
-		raise ValueError(f"{roi['roi_name']} has no {year} data (available: {sorted(available)})")
 
-	print(f"Resolved {roi['roi_name']} -> {roi_ndvi_3day_url(roi)}")
-	title = f"API: PhenoCam Time Series for GCC_90 and NDVI_90 ({roi['roi_name']}, {year})"
-	output_file = output_dir / f"API_data_{roi['roi_name']}_{year}.png"
+def plot_from_results(
+	results_json: str | Path,
+	output_dir: Path = OUTPUT_DIR,
+	limit: int | None = None,
+) -> list[Path]:
+	"""Plot every site-year in a results JSON to output/api (defaults to prep).
 
-	output_dir.mkdir(parents=True, exist_ok=True)
-	scores = site_agreement_score(timeseries, year)
-	fig, gcc_phases, ndvi_phases = create_plot(timeseries, year, title, scores=scores)
-	save_plot(fig, output_file)
-
-	print(f"Saved {output_file}")
-	print(f"  GCC_90 phases (DOY, {year}): {gcc_phases}")
-	print(f"  NDVI_90 phases (DOY, {year}): {ndvi_phases}")
-	return output_file
+	Thin wrapper over shared.plot_json.plot_from_results; see that function for
+	the accepted JSON formats (step2_phenology.json / pipeline_results.json).
+	"""
+	return _plot_from_results(results_json, output_dir, limit=limit)
 
 
 def main() -> None:
