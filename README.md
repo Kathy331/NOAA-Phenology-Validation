@@ -19,9 +19,6 @@ package imports with no extra step --> just run the commands below.
 
 ## Project layout
 
-Shared code lives in one place; the two stages import from it instead of keeping
-their own copies.
-
 - `shared/` - shared code (single source of truth), imported via the repo-root
   `sys.path` bootstrap in each entry script (no install step):
   - `PhenoloDates.py` - CCRmax phenophase date detection (SOS/MOS/DOS/EOS)
