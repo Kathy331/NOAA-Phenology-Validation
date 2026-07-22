@@ -12,6 +12,7 @@ from .PhenoloDates import compute_phases
 
 GCC_COLOR = "#1f77b4"
 NDVI_COLOR = "#d62728"
+GVF_COLOR = "#17becf"  # satellite Green Vegetation Fraction (third series, distinct from GCC blue)
 
 PHASE_ORDER = ("SOS", "MOS", "DOS", "EOS")
 PHASES = {
@@ -38,21 +39,24 @@ def phases_to_dates(year: int, phases: dict[str, float]) -> dict[str, pd.Timesta
 
 
 def format_phase_label(prefixes: list[str], phase: str) -> str:
-	if len(prefixes) == 2:
-		return f"GCC & NDVI {phase}"
-	return f"{prefixes[0]} {phase}"
+	return f"{' & '.join(prefixes)} {phase}"
 
 
-def collect_phase_markers(
-	gcc_dates: dict[str, pd.Timestamp], ndvi_dates: dict[str, pd.Timestamp]
-) -> list[dict]:
+def collect_phase_markers(series_dates: dict[str, dict[str, pd.Timestamp]]) -> list[dict]:
+	"""Group SOS/MOS/DOS/EOS markers across any number of labelled series.
+
+	`series_dates` maps a series label (e.g. "GCC", "NDVI", "GVF") to its
+	{phase: date} dict. Series that share a phase and land on the same date are
+	merged onto one line with a combined label (e.g. "GCC & NDVI SOS"), so the
+	function handles two series (GCC/NDVI) or three (adding GVF) unchanged.
+	"""
 	markers = []
 	for phase in PHASE_ORDER:
 		by_date: dict[pd.Timestamp, list[str]] = {}
-		if not pd.isna(gcc_dates.get(phase)):
-			by_date.setdefault(gcc_dates[phase], []).append("GCC")
-		if not pd.isna(ndvi_dates.get(phase)):
-			by_date.setdefault(ndvi_dates[phase], []).append("NDVI")
+		for label, dates in series_dates.items():
+			date = dates.get(phase)
+			if not pd.isna(date):
+				by_date.setdefault(date, []).append(label)
 
 		for date, prefixes in by_date.items():
 			markers.append(
@@ -93,10 +97,16 @@ def _set_cluster_sides(cluster: list[dict]) -> None:
 		marker["side"] = "left" if len(cluster) > 1 and index == 0 else "right"
 
 
-def draw_phases(ax, gcc_dates: dict[str, pd.Timestamp], ndvi_dates: dict[str, pd.Timestamp]) -> None:
+def draw_phases(ax, series_dates: dict[str, dict[str, pd.Timestamp]]) -> None:
+	"""Draw vertical phase-transition lines for each labelled series on `ax`.
+
+	`series_dates` maps a series label to its {phase: date} dict (e.g.
+	{"GCC": ..., "NDVI": ..., "GVF": ...}). Lines are x-only, so they render
+	correctly no matter which y-axis a curve is plotted against.
+	"""
 	label_transform = ax.get_xaxis_transform()
 
-	markers = assign_label_sides(collect_phase_markers(gcc_dates, ndvi_dates))
+	markers = assign_label_sides(collect_phase_markers(series_dates))
 	for marker in markers:
 		style = marker["style"]
 		line_date = marker["date"]
@@ -157,6 +167,40 @@ def draw_agreement_score(ax, scores: dict) -> None:
 	)
 
 
+def draw_satellite_scores(ax, gvf_vs_gcc: dict | None, gvf_vs_ndvi: dict | None) -> None:
+	"""Annotate the bottom right with the GVF agreement scores (lower = better).
+
+	One line per comparison; each argument is a DynamicTimeWrap.pairwise_agreement
+	result (divergence_score, phenophase_gap_days, dtw_per_step) or None.
+	"""
+
+	def line(tag: str, scores: dict | None) -> str:
+		scores = scores or {}
+		return (
+			f"{tag}  Divergence: {_format_score(scores.get('divergence_score'))}"
+			f"   |   gap: {_format_score(scores.get('phenophase_gap_days'), ' d')}"
+			f"   |   DTW/step: {_format_score(scores.get('dtw_per_step'))}"
+		)
+
+	text = (
+		"GVF agreement (lower = better)\n"
+		+ line("GVF vs GCC ", gvf_vs_gcc)
+		+ "\n"
+		+ line("GVF vs NDVI", gvf_vs_ndvi)
+	)
+	ax.text(
+		0.99,
+		0.02,
+		text,
+		transform=ax.transAxes,
+		ha="right",
+		va="bottom",
+		fontsize=8.5,
+		bbox={"boxstyle": "round,pad=0.4", "facecolor": "#fffbe6", "edgecolor": "#888888", "alpha": 0.95},
+		zorder=6,
+	)
+
+
 def create_plot(timeseries: pd.DataFrame, year: int, title: str, scores: dict | None = None):
 	"""Build the dual-axis GCC/NDVI figure with phase markers.
 
@@ -192,7 +236,7 @@ def create_plot(timeseries: pd.DataFrame, year: int, title: str, scores: dict | 
 	ax.grid(True, alpha=0.3)
 	fig.suptitle(title, y=0.90, fontsize=14)
 
-	draw_phases(ax, gcc_dates, ndvi_dates)
+	draw_phases(ax, {"GCC": gcc_dates, "NDVI": ndvi_dates})
 	if scores is not None:
 		draw_agreement_score(ax2, scores)
 
@@ -201,6 +245,74 @@ def create_plot(timeseries: pd.DataFrame, year: int, title: str, scores: dict | 
 	handles2, labels2 = ax2.get_legend_handles_labels()
 	ax.legend(handles + handles2, labels + labels2, loc="upper left")
 	return fig, gcc_phases, ndvi_phases
+
+
+def create_satellite_plot(
+	timeseries: pd.DataFrame,
+	gvf: pd.DataFrame,
+	year: int,
+	title: str,
+	gvf_vs_gcc: dict | None = None,
+	gvf_vs_ndvi: dict | None = None,
+):
+	"""Overlay GVF (satellite) with PhenoCam GCC and NDVI for one site-year.
+
+	`timeseries` is the PhenoCam dataframe (needs date/year/doy/gcc_90/ndvi_90);
+	`gvf` is a dataframe with date/year/doy/gvf (0-100). Draws GCC on the left
+	axis, NDVI on a right axis, and GVF on a third offset right axis (real 0-100
+	units), phase markers for all three series, and the GVF-vs-GCC / GVF-vs-NDVI
+	score box. Returns (figure, gcc_phases, ndvi_phases, gvf_phases).
+	"""
+	year_df = timeseries.loc[timeseries["year"] == year]
+	gvf_df = gvf.loc[gvf["year"] == year]
+	if year_df.empty:
+		raise ValueError(f"No PhenoCam rows found for year {year}")
+	if gvf_df.empty:
+		raise ValueError(f"No GVF rows found for year {year}")
+
+	gcc_phases = compute_phases(year_df["doy"].values, year_df["gcc_90"].values)
+	ndvi_phases = compute_phases(year_df["doy"].values, year_df["ndvi_90"].values)
+	gvf_phases = compute_phases(gvf_df["doy"].values, gvf_df["gvf"].values)
+	gcc_dates = phases_to_dates(year, gcc_phases)
+	ndvi_dates = phases_to_dates(year, ndvi_phases)
+	gvf_dates = phases_to_dates(year, gvf_phases)
+
+	fig, ax = plt.subplots(figsize=(14, 7))
+
+	ax.plot(year_df["date"], year_df["gcc_90"], color=GCC_COLOR, linewidth=2.2, label="GCC_90")
+	ax.set_xlabel("Date")
+	ax.set_ylabel("GCC_90", color=GCC_COLOR)
+	ax.tick_params(axis="y", labelcolor=GCC_COLOR)
+
+	ax2 = ax.twinx()
+	ax2.plot(year_df["date"], year_df["ndvi_90"], color=NDVI_COLOR, linewidth=2.2, label="NDVI_90")
+	ax2.set_ylabel("NDVI_90", color=NDVI_COLOR)
+	ax2.tick_params(axis="y", labelcolor=NDVI_COLOR)
+
+	ax3 = ax.twinx()
+	# Push the third axis outward so its spine/label clears the NDVI axis.
+	ax3.spines["right"].set_position(("axes", 1.08))
+	ax3.plot(gvf_df["date"], gvf_df["gvf"], color=GVF_COLOR, linewidth=2.2, label="GVF")
+	ax3.set_ylabel("GVF (%)", color=GVF_COLOR)
+	ax3.tick_params(axis="y", labelcolor=GVF_COLOR)
+	ax3.set_ylim(0, 100)
+
+	ax.xaxis.set_major_locator(mdates.MonthLocator(interval=1))
+	ax.xaxis.set_major_formatter(mdates.DateFormatter("%Y-%m"))
+	fig.autofmt_xdate()
+	ax.grid(True, alpha=0.3)
+	fig.suptitle(title, y=0.90, fontsize=14)
+
+	draw_phases(ax, {"GCC": gcc_dates, "NDVI": ndvi_dates, "GVF": gvf_dates})
+	if gvf_vs_gcc is not None or gvf_vs_ndvi is not None:
+		draw_satellite_scores(ax2, gvf_vs_gcc, gvf_vs_ndvi)
+
+	fig.subplots_adjust(top=0.86, right=0.86)
+	handles, labels = ax.get_legend_handles_labels()
+	handles2, labels2 = ax2.get_legend_handles_labels()
+	handles3, labels3 = ax3.get_legend_handles_labels()
+	ax.legend(handles + handles2 + handles3, labels + labels2 + labels3, loc="upper left")
+	return fig, gcc_phases, ndvi_phases, gvf_phases
 
 
 def save_plot(fig, output_file) -> None:
