@@ -1,0 +1,437 @@
+{
+  "thresholds": {
+    "cv_max": 0.1,
+    "water_max": 0.05,
+    "nonveg_max": 0.05
+  },
+  "surface_source": "ESA/WorldCover/v200",
+  "params": {
+    "cloud_pct": 5,
+    "box_radius_m": 2000,
+    "ndvi_scale_m": 10,
+    "summer_half_window_days": 30
+  },
+  "counts": {
+    "evaluated": 21,
+    "passed": 3
+  },
+  "sites": [
+    {
+      "name": "NEON.D01.BART.DP1.00033_DB_1000",
+      "lat": 44.063869,
+      "lon": -71.287375,
+      "year": 2023,
+      "summer_doy": 206,
+      "summer_source": "MOS-DOS",
+      "window": [
+        "2023-06-25",
+        "2023-08-25"
+      ],
+      "n_images": 1,
+      "cv_ndvi": 0.1353,
+      "water_pct": 0.0031,
+      "bare_pct": 0.0066,
+      "urban_pct": 0.0113,
+      "nonveg_pct": 0.0178,
+      "passed": false,
+      "status": "ok"
+    },
+    {
+      "name": "NEON.D01.BART.DP1.00033_DB_1000",
+      "lat": 44.063869,
+      "lon": -71.287375,
+      "year": 2024,
+      "summer_doy": 200,
+      "summer_source": "MOS-DOS",
+      "window": [
+        "2024-06-18",
+        "2024-08-18"
+      ],
+      "n_images": 3,
+      "cv_ndvi": 0.1866,
+      "water_pct": 0.0031,
+      "bare_pct": 0.0066,
+      "urban_pct": 0.0113,
+      "nonveg_pct": 0.0178,
+      "passed": false,
+      "status": "ok"
+    },
+    {
+      "name": "NEON.D01.HARV.DP1.00033_DB_1000",
+      "lat": 42.536911,
+      "lon": -72.17265,
+      "year": 2023,
+      "summer_doy": 212,
+      "summer_source": "MOS-DOS",
+      "window": [
+        "2023-07-01",
+        "2023-08-31"
+      ],
+      "n_images": 1,
+      "cv_ndvi": 0.1645,
+      "water_pct": 0.0005,
+      "bare_pct": 0.0,
+      "urban_pct": 0.0031,
+      "nonveg_pct": 0.0031,
+      "passed": false,
+      "status": "ok"
+    },
+    {
+      "name": "NEON.D01.HARV.DP1.00033_DB_1000",
+      "lat": 42.536911,
+      "lon": -72.17265,
+      "year": 2024,
+      "summer_doy": 196,
+      "summer_source": "MOS-DOS",
+      "window": [
+        "2024-06-14",
+        "2024-08-14"
+      ],
+      "n_images": 2,
+      "cv_ndvi": 0.0756,
+      "water_pct": 0.0005,
+      "bare_pct": 0.0,
+      "urban_pct": 0.0031,
+      "nonveg_pct": 0.0031,
+      "passed": true,
+      "status": "ok"
+    },
+    {
+      "name": "NEON.D06.KONA.DP1.00033_AG_1000",
+      "lat": 39.110446,
+      "lon": -96.612935,
+      "year": 2023,
+      "summer_doy": 216,
+      "summer_source": "MOS-DOS",
+      "window": [
+        "2023-07-05",
+        "2023-09-04"
+      ],
+      "n_images": 5,
+      "cv_ndvi": 0.2697,
+      "water_pct": 0.0003,
+      "bare_pct": 0.0003,
+      "urban_pct": 0.0114,
+      "nonveg_pct": 0.0118,
+      "passed": false,
+      "status": "ok"
+    },
+    {
+      "name": "NEON.D06.KONA.DP1.00033_AG_1000",
+      "lat": 39.110446,
+      "lon": -96.612935,
+      "year": 2024,
+      "summer_doy": 114,
+      "summer_source": "MOS-DOS",
+      "window": [
+        "2024-03-24",
+        "2024-05-24"
+      ],
+      "n_images": 7,
+      "cv_ndvi": 0.4334,
+      "water_pct": 0.0003,
+      "bare_pct": 0.0003,
+      "urban_pct": 0.0114,
+      "nonveg_pct": 0.0118,
+      "passed": false,
+      "status": "ok"
+    },
+    {
+      "name": "NEON.D07.ORNL.DP1.00033_DB_1000",
+      "lat": 35.964128,
+      "lon": -84.282588,
+      "year": 2023,
+      "summer_doy": 180,
+      "summer_source": "MOS-DOS",
+      "window": [
+        "2023-05-30",
+        "2023-07-30"
+      ],
+      "n_images": 2,
+      "cv_ndvi": 0.27,
+      "water_pct": 0.0103,
+      "bare_pct": 0.0107,
+      "urban_pct": 0.0524,
+      "nonveg_pct": 0.0631,
+      "passed": false,
+      "status": "ok"
+    },
+    {
+      "name": "NEON.D07.ORNL.DP1.00033_DB_1000",
+      "lat": 35.964128,
+      "lon": -84.282588,
+      "year": 2024,
+      "summer_doy": 173,
+      "summer_source": "MOS-DOS",
+      "window": [
+        "2024-05-22",
+        "2024-07-22"
+      ],
+      "n_images": 2,
+      "cv_ndvi": 0.2684,
+      "water_pct": 0.0103,
+      "bare_pct": 0.0107,
+      "urban_pct": 0.0524,
+      "nonveg_pct": 0.0631,
+      "passed": false,
+      "status": "ok"
+    },
+    {
+      "name": "NEON.D08.DELA.DP1.00033_DB_1000",
+      "lat": 32.541727,
+      "lon": -87.803877,
+      "year": 2023,
+      "summer_doy": 180,
+      "summer_source": "MOS-DOS",
+      "window": [
+        "2023-05-30",
+        "2023-07-30"
+      ],
+      "n_images": 1,
+      "cv_ndvi": 0.4538,
+      "water_pct": 0.1397,
+      "bare_pct": 0.0001,
+      "urban_pct": 0.0009,
+      "nonveg_pct": 0.0011,
+      "passed": false,
+      "status": "ok"
+    },
+    {
+      "name": "NEON.D08.DELA.DP1.00033_DB_1000",
+      "lat": 32.541727,
+      "lon": -87.803877,
+      "year": 2024,
+      "summer_doy": 168,
+      "summer_source": "MOS-DOS",
+      "window": [
+        "2024-05-17",
+        "2024-07-17"
+      ],
+      "n_images": 2,
+      "cv_ndvi": 0.4266,
+      "water_pct": 0.1397,
+      "bare_pct": 0.0001,
+      "urban_pct": 0.0009,
+      "nonveg_pct": 0.0011,
+      "passed": false,
+      "status": "ok"
+    },
+    {
+      "name": "NEON.D08.TALL.DP1.00033_EN_1000",
+      "lat": 32.95047,
+      "lon": -87.393259,
+      "year": 2023,
+      "summer_doy": 248,
+      "summer_source": "MOS-DOS",
+      "window": [
+        "2023-08-06",
+        "2023-10-06"
+      ],
+      "n_images": 2,
+      "cv_ndvi": 0.0829,
+      "water_pct": 0.0002,
+      "bare_pct": 0.0,
+      "urban_pct": 0.0001,
+      "nonveg_pct": 0.0001,
+      "passed": true,
+      "status": "ok"
+    },
+    {
+      "name": "NEON.D08.TALL.DP1.00033_EN_1000",
+      "lat": 32.95047,
+      "lon": -87.393259,
+      "year": 2024,
+      "summer_doy": 212,
+      "summer_source": "MOS-DOS",
+      "window": null,
+      "n_images": null,
+      "cv_ndvi": null,
+      "water_pct": null,
+      "bare_pct": null,
+      "urban_pct": null,
+      "nonveg_pct": null,
+      "passed": false,
+      "status": "error: Image.normalizedDifference: No band named 'B8'. Available band names: []."
+    },
+    {
+      "name": "NEON.D10.CPER.DP1.00033_GR_1000",
+      "lat": 40.81553,
+      "lon": -104.7456,
+      "year": 2023,
+      "summer_doy": 156,
+      "summer_source": "MOS-DOS",
+      "window": [
+        "2023-05-06",
+        "2023-07-06"
+      ],
+      "n_images": 7,
+      "cv_ndvi": 0.1861,
+      "water_pct": 0.0008,
+      "bare_pct": 0.0001,
+      "urban_pct": 0.0001,
+      "nonveg_pct": 0.0002,
+      "passed": false,
+      "status": "ok"
+    },
+    {
+      "name": "NEON.D10.CPER.DP1.00033_GR_1000",
+      "lat": 40.81553,
+      "lon": -104.7456,
+      "year": 2024,
+      "summer_doy": 10,
+      "summer_source": "MOS-DOS",
+      "window": [
+        "2023-12-11",
+        "2024-02-10"
+      ],
+      "n_images": 8,
+      "cv_ndvi": 0.1533,
+      "water_pct": 0.0008,
+      "bare_pct": 0.0001,
+      "urban_pct": 0.0001,
+      "nonveg_pct": 0.0002,
+      "passed": false,
+      "status": "ok"
+    },
+    {
+      "name": "NEON.D13.MOAB.DP1.00033_GR_1000",
+      "lat": 38.24833,
+      "lon": -109.38827,
+      "year": 2023,
+      "summer_doy": 137,
+      "summer_source": "MOS-DOS",
+      "window": [
+        "2023-04-17",
+        "2023-06-17"
+      ],
+      "n_images": 4,
+      "cv_ndvi": 0.1825,
+      "water_pct": 0.0,
+      "bare_pct": 0.2165,
+      "urban_pct": 0.0043,
+      "nonveg_pct": 0.2208,
+      "passed": false,
+      "status": "ok"
+    },
+    {
+      "name": "NEON.D13.MOAB.DP1.00033_GR_1000",
+      "lat": 38.24833,
+      "lon": -109.38827,
+      "year": 2024,
+      "summer_doy": 174,
+      "summer_source": "MOS-DOS",
+      "window": [
+        "2024-05-23",
+        "2024-07-23"
+      ],
+      "n_images": 5,
+      "cv_ndvi": 0.1833,
+      "water_pct": 0.0,
+      "bare_pct": 0.2165,
+      "urban_pct": 0.0043,
+      "nonveg_pct": 0.2208,
+      "passed": false,
+      "status": "ok"
+    },
+    {
+      "name": "NEON.D14.JORN.DP1.00033_GR_1000",
+      "lat": 32.59068,
+      "lon": -106.84254,
+      "year": 2024,
+      "summer_doy": 110,
+      "summer_source": "MOS-DOS",
+      "window": [
+        "2024-03-20",
+        "2024-05-20"
+      ],
+      "n_images": 12,
+      "cv_ndvi": 0.0681,
+      "water_pct": 0.0,
+      "bare_pct": 0.002,
+      "urban_pct": 0.0,
+      "nonveg_pct": 0.002,
+      "passed": true,
+      "status": "ok"
+    },
+    {
+      "name": "NEON.D14.SRER.DP1.00033_SH_1000",
+      "lat": 31.91068,
+      "lon": -110.83549,
+      "year": 2023,
+      "summer_doy": 242,
+      "summer_source": "MOS-DOS",
+      "window": [
+        "2023-07-31",
+        "2023-09-30"
+      ],
+      "n_images": 4,
+      "cv_ndvi": 0.2151,
+      "water_pct": 0.0,
+      "bare_pct": 0.0143,
+      "urban_pct": 0.0031,
+      "nonveg_pct": 0.0174,
+      "passed": false,
+      "status": "ok"
+    },
+    {
+      "name": "NEON.D14.SRER.DP1.00033_SH_1000",
+      "lat": 31.91068,
+      "lon": -110.83549,
+      "year": 2024,
+      "summer_doy": 90,
+      "summer_source": "MOS-DOS",
+      "window": [
+        "2024-02-29",
+        "2024-04-30"
+      ],
+      "n_images": 5,
+      "cv_ndvi": 0.189,
+      "water_pct": 0.0,
+      "bare_pct": 0.0143,
+      "urban_pct": 0.0031,
+      "nonveg_pct": 0.0174,
+      "passed": false,
+      "status": "ok"
+    },
+    {
+      "name": "NEON.D15.ONAQ.DP1.00033_SH_1000",
+      "lat": 40.177599,
+      "lon": -112.452452,
+      "year": 2023,
+      "summer_doy": 167,
+      "summer_source": "MOS-DOS",
+      "window": [
+        "2023-05-17",
+        "2023-07-17"
+      ],
+      "n_images": 8,
+      "cv_ndvi": 0.3306,
+      "water_pct": 0.0,
+      "bare_pct": 0.0016,
+      "urban_pct": 0.0009,
+      "nonveg_pct": 0.0025,
+      "passed": false,
+      "status": "ok"
+    },
+    {
+      "name": "NEON.D15.ONAQ.DP1.00033_SH_1000",
+      "lat": 40.177599,
+      "lon": -112.452452,
+      "year": 2024,
+      "summer_doy": 148,
+      "summer_source": "MOS-DOS",
+      "window": [
+        "2024-04-27",
+        "2024-06-27"
+      ],
+      "n_images": 9,
+      "cv_ndvi": 0.2182,
+      "water_pct": 0.0,
+      "bare_pct": 0.0016,
+      "urban_pct": 0.0009,
+      "nonveg_pct": 0.0025,
+      "passed": false,
+      "status": "ok"
+    }
+  ]
+}

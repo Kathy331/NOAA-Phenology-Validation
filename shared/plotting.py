@@ -3,11 +3,12 @@
 Keeps all matplotlib/figure styling concerns out of test.py.
 """
 
+import math
 import matplotlib.dates as mdates
 import matplotlib.pyplot as plt
 import pandas as pd
 
-from PhenoloDates import compute_phases
+from .PhenoloDates import compute_phases
 
 GCC_COLOR = "#1f77b4"
 NDVI_COLOR = "#d62728"
@@ -126,11 +127,42 @@ def draw_phases(ax, gcc_dates: dict[str, pd.Timestamp], ndvi_dates: dict[str, pd
 		)
 
 
-def create_plot(timeseries: pd.DataFrame, year: int, title: str):
+def _format_score(value: float, suffix: str = "") -> str:
+	return f"{value:.2f}{suffix}" if value is not None and math.isfinite(value) else "n/a"
+
+
+def draw_agreement_score(ax, scores: dict) -> None:
+	"""Annotate the bottom right corner with the NDVI-GCC Divergence Score.
+
+	Lower = better. `scores` is the dict from
+	DynamicTimeWrap.site_agreement_score: it has divergence_score,
+	phenophase_gap_days, and dtw_per_step.
+	"""
+	text = (
+		f"Divergence Score: {_format_score(scores.get('divergence_score'))}"
+		"  (lower = better)\n"
+		f"phenophase gap: {_format_score(scores.get('phenophase_gap_days'), ' d')}"
+		f"   |   DTW/step: {_format_score(scores.get('dtw_per_step'))}"
+	)
+	ax.text(
+		0.99,
+		0.02,
+		text,
+		transform=ax.transAxes,
+		ha="right",
+		va="bottom",
+		fontsize=9,
+		bbox={"boxstyle": "round,pad=0.4", "facecolor": "#fffbe6", "edgecolor": "#888888", "alpha": 0.95},
+		zorder=6,
+	)
+
+
+def create_plot(timeseries: pd.DataFrame, year: int, title: str, scores: dict | None = None):
 	"""Build the dual-axis GCC/NDVI figure with phase markers.
 
-	Returns (figure, gcc_phases, ndvi_phases) so the caller can also log the DOY
-	phase values.
+	If `scores` (from DynamicTimeWrap.site_agreement_score) is given, the NDVI-GCC
+	Divergence Score is annotated on the plot. Returns (figure, gcc_phases,
+	ndvi_phases) so the caller can also log the DOY phase values.
 	"""
 	year_df = timeseries.loc[timeseries["year"] == year]
 	if year_df.empty:
@@ -161,6 +193,8 @@ def create_plot(timeseries: pd.DataFrame, year: int, title: str):
 	fig.suptitle(title, y=0.90, fontsize=14)
 
 	draw_phases(ax, gcc_dates, ndvi_dates)
+	if scores is not None:
+		draw_agreement_score(ax2, scores)
 
 	fig.subplots_adjust(top=0.86)
 	handles, labels = ax.get_legend_handles_labels()

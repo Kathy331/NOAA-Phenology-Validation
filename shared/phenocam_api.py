@@ -1,15 +1,15 @@
 """Fetch and load PhenoCam metadata and summary time series from the public API/archive.
 
 The PhenoCam REST API (https://phenocam.nau.edu/api/) exposes metadata such as
-the ROI list (/api/roilists/). The actual 3-day summary CSVs are served as static
+the ROI list (/api/roilists/). The actual 3 day summary CSVs are served as static
 files under the data archive:
 
     https://phenocam.nau.edu/data/archive/{site}/ROI/{site}_{veg}_{roi}_ndvi_3day.csv
 
 Typical use: resolve a site name to its ROI metadata with find_roi(), then download
 the NDVI series with fetch_ndvi_3day_for_roi(), and parse it with load_timeseries().
-The same loader accepts a local path or an in-memory buffer, so downloaded CSVs are
-handled exactly like on-disk ones.
+
+The same loader accepts a local path.
 """
 
 import io
@@ -20,18 +20,14 @@ import pandas as pd
 
 API_BASE = "https://phenocam.nau.edu/api"
 ARCHIVE_BASE = "https://phenocam.nau.edu/data/archive"
-# The roilists endpoint has no server-side filtering, so we request every record
-# in a single page and filter client-side.
-ROILIST_PAGE_SIZE = 2000
+ROILIST_PAGE_SIZE = 2000 # maximum number of records to fetch at once
 
 NUMERIC_COLUMNS = ("doy", "year", "gcc_90", "ndvi_90")
 REQUIRED_COLUMNS = ("date", *NUMERIC_COLUMNS)
 
 
 def load_timeseries(source) -> pd.DataFrame:
-	"""Read a PhenoCam summary CSV into a cleaned, date-sorted DataFrame.
-
-	`source` is a path or a file-like object (e.g. io.StringIO of downloaded text).
+	"""Read a PhenoCam summary CSV into a cleaned, date sorted DataFrame.
 	"""
 	df = pd.read_csv(source, comment="#")
 	df["date"] = pd.to_datetime(df["date"], errors="coerce")
@@ -79,7 +75,7 @@ def find_roi(
 
 	Optionally narrow by vegetation type and ROI sequence number. When several
 	ROIs match, the lowest sequence number wins, so a bare site name resolves to
-	its primary ROI. Pass a pre-fetched `rois` list to avoid repeat downloads.
+	its primary ROI. Pass a prefetched `rois` list to avoid repeat downloads.
 	"""
 	rois = rois if rois is not None else list_rois(timeout=timeout)
 	matches = [r for r in rois if r["site"] == site]
@@ -101,18 +97,18 @@ def ndvi_3day_url(site: str, veg_type: str, roi_id: int | str) -> str:
 
 
 def roi_ndvi_3day_url(roi: dict) -> str:
-	"""NDVI 3-day summary URL derived from an ROI metadata record."""
+	"""NDVI 3 day summary URL derived from an ROI metadata record."""
 	return ndvi_3day_url(roi["site"], roi["roitype"], roi["sequence_number"])
 
 
 def fetch_ndvi_3day(site: str, veg_type: str, roi_id: int | str, timeout: float = 30.0) -> io.StringIO:
-	"""Download an NDVI 3-day summary by explicit site/veg/ROI as a text buffer."""
+	"""Download an NDVI 3 day summary by explicit site/veg/ROI as a text buffer."""
 	text = fetch_csv_text(ndvi_3day_url(site, veg_type, roi_id), timeout=timeout)
 	return io.StringIO(text)
 
 
 def fetch_ndvi_3day_for_roi(roi: dict, timeout: float = 30.0) -> io.StringIO:
-	"""Download the NDVI 3-day summary for a resolved ROI record.
+	"""Download the NDVI 3 day summary for a resolved ROI record.
 
 	Raises if the ROI has no infrared/NDVI product (ir_flag is false).
 	"""

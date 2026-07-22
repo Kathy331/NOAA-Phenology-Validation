@@ -17,37 +17,35 @@ year output JSON; multi threading speeds up the per-site downloads/comparisons.
 """
 
 import json
-import sys
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
 
 import numpy as np
 import pandas as pd
 
-SRC_DIR = Path(__file__).resolve().parent.parent
-#(plotting, PhenoloDates files)
-sys.path.insert(0, str(SRC_DIR))
-
-from PhenoloDates import compute_phases 
-from phenocam_api import ( 
+from .PhenoloDates import compute_phases
+from .phenocam_api import (
 	fetch_ndvi_3day_for_roi,
 	list_rois,
 	load_timeseries,
 )
 
-YEAR = 2024  # year to compare NDVI vs GCC (may pass in any year)
-PHENOPHASE_KEYS = ("SOS", "MOS", "DOS", "EOS")  # the phases compute_phases returns
-CANDIDATE_GAP_DAYS = 14  # used to scale the phenophase part of the divergence score
-MIN_POINTS = 10  # need at least this many samples in a year to score it
+# reads/writes the data prep JSONs under prep/output/api
+REPO_DIR = Path(__file__).resolve().parent.parent
+
+YEAR = 2024  # year to compare NDVI vs GCC (may pass in any year w/ function: site_agreement_score(timeseries, year))
+PHENOPHASE_KEYS = ("SOS", "MOS", "DOS", "EOS")   
+CANDIDATE_GAP_DAYS = 14 						 # divergence score scaling factor				
+MIN_POINTS = 10 								 # minimum number of samples, otherwise score is NaN
 MAX_WORKERS = 20 
 
-YEAR_CHECK_JSON = SRC_DIR / "output" / "api" / "year_check.json"
-OUTPUT_JSON = SRC_DIR / "output" / "api" / "site_ranking.json"
+YEAR_CHECK_JSON = REPO_DIR / "prep" / "output" / "api" / "year_check.json"
+OUTPUT_JSON = REPO_DIR / "prep" / "output" / "api" / "site_ranking.json"
 
  
 # Phenophase date comparison (CCRmax, via PhenoloDates.compute_phases)
 def phenophase_gaps(ndvi_phases: dict[str, float], gcc_phases: dict[str, float]) -> dict[str, float]:
-	"""Absolute NDVI-vs-GCC day gaps per phase plus their mean.
+	"""Absolute NDVI vs GCC day gaps per phase plus their mean.
 
 	Keys: SOS_gap, MOS_gap, DOS_gap, EOS_gap, mean_gap. The mean ignores phases
 	that are missing (np.nan) in either series.
@@ -63,7 +61,7 @@ def phenophase_gaps(ndvi_phases: dict[str, float], gcc_phases: dict[str, float])
 
 
 def phenophase_score(timeseries: pd.DataFrame, year: int = YEAR) -> tuple[float, dict]:
-	"""Mean NDVI-vs-GCC phenophase gap (days) for a single `year`.
+	"""Mean NDVI vs GCC phenophase gap (days) for a single `year`.
 
 	Returns (score, detail). score is np.nan if the year cannot be scored; detail
 	holds the per-curve phase dates and the per-phase gaps.
@@ -108,7 +106,13 @@ def dtw_distance(a, b) -> float:
 
 
 def _aligned_normalized_year(timeseries: pd.DataFrame, year: int):
-	"""Daily-aligned, gap-filled, [0,1]-normalized (ndvi, gcc) for one year."""
+	"""
+	1. Daily resampling: Convert the raw data to daily averages, filling gaps with the mean of the surrounding days.
+	2. Gap filling: Use linear interpolation to fill in missing data points.
+	3. Forward/backward filling: Fill in missing data points at the start and end of the year.
+	4. Normalization: Scale the data to [0,1] range.
+	5. Return the normalized NDVI and GCC curves.
+	"""
 	year_df = (
 		timeseries.loc[timeseries["year"] == year, ["date", "ndvi_90", "gcc_90"]]
 		.dropna(subset=["date"])
@@ -136,12 +140,11 @@ def dtw_score(timeseries: pd.DataFrame, year: int = YEAR) -> float:
  
 # Divergence score (phenophase gap + per-step DTW)
 def site_agreement_score(timeseries: pd.DataFrame, year: int = YEAR) -> dict[str, float]:
-	"""NDVI-vs-GCC divergence score for a single site and `year`.
+	"""NDVI vs GCC divergence score for a single site and `year`.
 
 	Combines the phenophase gap (scaled by CANDIDATE_GAP_DAYS) with the per-step
-	DTW cost into one self-contained number. Returns the year,
-	phenophase_gap_days, dtw_per_step, and their sum as `divergence_score`
-	(lower = better agreement).
+	DTW cost into one self-contained number. Returns the year, phenophase gap days,
+	DTW per step, and their sum as `divergence_score` (lower = better agreement).
 	"""
 	pheno, _ = phenophase_score(timeseries, year)
 
@@ -166,12 +169,12 @@ def site_agreement_score(timeseries: pd.DataFrame, year: int = YEAR) -> dict[str
 	}
 
 
-# Driver
+# load the candidate site names from the year check JSON (check input folder for year_check.json)
 def load_candidate_names() -> list[str]:
 	"""roi_names with both 2023 and 2024 data, from year_check.json."""
 	if not YEAR_CHECK_JSON.exists():
 		raise FileNotFoundError(
-			f"{YEAR_CHECK_JSON} not found -- run api/api_year_check.py first to generate it."
+			f"{YEAR_CHECK_JSON} not found; run prep/api/api_year_check.py first to generate it."
 		)
 	data = json.loads(YEAR_CHECK_JSON.read_text())
 	return data["has_both_2023_and_2024"]

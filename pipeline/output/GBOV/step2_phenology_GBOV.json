@@ -1,0 +1,47 @@
+{
+  "counts": {
+    "evaluated": 3,
+    "scored": 3
+  },
+  "sites": [
+    {
+      "name": "NEON.D01.HARV.DP1.00033_DB_1000",
+      "lat": 42.536911,
+      "lon": -72.17265,
+      "year": 2024,
+      "metadata": {
+        "year": 2024,
+        "phenophase_gap_days": 12.5,
+        "dtw_per_step": 0.0364,
+        "divergence_score": 0.9292
+      },
+      "status": "ok"
+    },
+    {
+      "name": "NEON.D08.TALL.DP1.00033_EN_1000",
+      "lat": 32.95047,
+      "lon": -87.393259,
+      "year": 2023,
+      "metadata": {
+        "year": 2023,
+        "phenophase_gap_days": 19.5,
+        "dtw_per_step": 0.0838,
+        "divergence_score": 1.4767
+      },
+      "status": "ok"
+    },
+    {
+      "name": "NEON.D14.JORN.DP1.00033_GR_1000",
+      "lat": 32.59068,
+      "lon": -106.84254,
+      "year": 2024,
+      "metadata": {
+        "year": 2024,
+        "phenophase_gap_days": 51.0,
+        "dtw_per_step": 0.0926,
+        "divergence_score": 3.7354
+      },
+      "status": "ok"
+    }
+  ]
+}
