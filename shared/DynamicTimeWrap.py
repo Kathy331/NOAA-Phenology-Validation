@@ -169,6 +169,75 @@ def site_agreement_score(timeseries: pd.DataFrame, year: int = YEAR) -> dict[str
 	}
 
 
+# Generic pairwise agreement (any two series, e.g. GVF vs GCC / GVF vs NDVI)
+def _aligned_normalized(dates, values, year: int):
+	"""Daily-aligned, gap-filled, [0,1]-normalized values for one series in `year`.
+
+	Same preprocessing as _aligned_normalized_year but for a single (dates,
+	values) series from any source (a PhenoCam column or a GVF txt file), so it
+	is not tied to the ndvi_90/gcc_90 column names. Returns the normalized 1-D
+	array, or None if there are too few points.
+	"""
+	frame = pd.DataFrame(
+		{
+			"date": pd.to_datetime(dates, errors="coerce"),
+			"value": pd.to_numeric(values, errors="coerce"),
+		}
+	).dropna(subset=["date"])
+	frame = frame.loc[frame["date"].dt.year == year].set_index("date").sort_index()
+	if frame.empty:
+		return None
+
+	daily = frame.resample("1D").mean().interpolate(method="time").ffill().bfill()
+	daily = daily.dropna()
+	if len(daily) < MIN_POINTS:
+		return None
+	return normalize01(daily["value"].values)
+
+
+def pairwise_agreement(
+	doy_a,
+	values_a,
+	dates_a,
+	doy_b,
+	values_b,
+	dates_b,
+	year: int,
+) -> dict[str, float]:
+	"""Divergence score between any two series (same recipe as site_agreement_score).
+
+	Series A and B are each given as (doy, values, dates). Combines the mean
+	phenophase gap (|DOY gap| across SOS/MOS/DOS/EOS, scaled by
+	CANDIDATE_GAP_DAYS) with the per-step DTW distance between the [0,1]
+	normalized daily curves into one `divergence_score` (lower = better). Because
+	it takes raw arrays, it works for GVF-vs-GCC and GVF-vs-NDVI, not just the
+	built-in NDVI-vs-GCC path.
+	"""
+	phases_a = compute_phases(np.asarray(doy_a, dtype=float), np.asarray(values_a, dtype=float))
+	phases_b = compute_phases(np.asarray(doy_b, dtype=float), np.asarray(values_b, dtype=float))
+	pheno = phenophase_gaps(phases_a, phases_b)["mean_gap"]
+
+	norm_a = _aligned_normalized(dates_a, values_a, year)
+	norm_b = _aligned_normalized(dates_b, values_b, year)
+	if norm_a is None or norm_b is None:
+		dtw_per_step = np.nan
+	else:
+		dtw_per_step = dtw_distance(norm_a, norm_b) / max(len(norm_a), len(norm_b), 1)
+
+	pheno_part = pheno / CANDIDATE_GAP_DAYS if np.isfinite(pheno) else np.nan
+	divergence = (
+		float(pheno_part + dtw_per_step)
+		if (np.isfinite(pheno_part) and np.isfinite(dtw_per_step))
+		else np.nan
+	)
+	return {
+		"year": year,
+		"phenophase_gap_days": pheno,
+		"dtw_per_step": dtw_per_step,
+		"divergence_score": divergence,
+	}
+
+
 # load the candidate site names from the year check JSON (check input folder for year_check.json)
 def load_candidate_names() -> list[str]:
 	"""roi_names with both 2023 and 2024 data, from year_check.json."""

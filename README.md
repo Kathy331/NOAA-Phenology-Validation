@@ -38,7 +38,9 @@ their own copies.
 - `validation_pipeline/` - **Stage 3: plotting.** Drop a screening results JSON
   into `validation_pipeline/input/`; `main.py` re-fetches each site's PhenoCam
   curves and saves a labelled NDVI/GCC plot per site-year to
-  `validation_pipeline/output/<json_stem>/`.
+  `validation_pipeline/output/<json_stem>/`. It also plots satellite GVF: drop
+  `GBOV_<year>/` folders of GVF text files into `input/` and each is overlaid
+  with its PhenoCam GCC/NDVI curves in `validation_pipeline/output/<folder>/`.
 - `test/` - loads CSVs from `test/data/ex--/`, runs phase detection and plots via
   `shared.plotting`. Outputs go to `test/output/`.
 
@@ -148,6 +150,18 @@ re-fetches each site's PhenoCam NDVI/GCC series and saves a labelled plot (with
 the cached divergence score) to `validation_pipeline/output/<json_stem>/`. The
 fetch + plot logic lives in `shared/plot_json.py` (which reuses
 `shared/plotting.py`), so the prep stage and this stage share one code path.
+
+### Satellite GVF plots
+
+To compare the ground camera against satellite greenness, drop the GBOV Green
+Vegetation Fraction folders (e.g. `GBOV_2023/`, `GBOV_2024/`, each holding
+`<SITE>.ops_GVF*_timeseries.txt` files of `YYYYMMDD,GVF`) into
+`validation_pipeline/input/`. The same `python3 main.py` run detects those
+folders (year inferred from the folder name), fetches each GBOV site's PhenoCam
+GCC/NDVI curves, and saves a three-curve plot (GVF + GCC + NDVI) with SOS/MOS/
+DOS/EOS markers for all three and freshly computed GVF-vs-GCC / GVF-vs-NDVI
+agreement scores to `validation_pipeline/output/<folder>/`. That logic lives in
+`shared/plot_satellite.py`.
 
 ## Testing:
 
