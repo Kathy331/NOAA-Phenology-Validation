@@ -6,8 +6,8 @@ raw curves. So these helpers refetch each site's NDVI 3 day series from PhenoCam
 and render it with shared.plotting, reusing the cached scores for the on plot
 divergence annotation.
 
-Shared by the data prep stage (prep/api/main.py) and the validation stage
-(validation_pipeline/main.py) so the fetch/plot logic lives in one place.
+Shared by the data prep stage (prep_pipeline/api/main.py) and the plotting stage
+(plotting_pipeline/main.py) so the fetch/plot logic lives in one place.
 """
 
 import json

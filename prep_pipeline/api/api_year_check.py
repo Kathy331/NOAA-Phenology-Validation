@@ -4,7 +4,7 @@ Pulls the full ROI list from /api/roilists/, downloads each NDVI 3 day summary
 (only ROIs with an IR/NDVI product), and inspects the available years. Each ROI
 is sorted into one of three buckets: has 2023 only, has 2024 only, or has both.
 
-Run with:  python prep/api/api_year_check.py
+Run with:  python prep_pipeline/api/api_year_check.py
 
 The resulting site lists are recorded in output/api/year_check.json
 """
@@ -14,7 +14,7 @@ import sys
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
 
-# Run with:  cd prep/api && python3 api_year_check.py
+# Run with:  cd prep_pipeline/api && python3 api_year_check.py
 # repo root for shared package imports
 sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 

@@ -1,24 +1,17 @@
-"""Validation stage: plot time series for screened sites and GBOV satellite data.
+"""Plotting stage: plot time series for screened sites and GBOV satellite data.
 
-Two kinds of input live under validation_pipeline/input/:
+Two kinds of input live under plotting_pipeline/input/:
 
 1. Results JSONs (e.g. uniformity_pipeline/output/<run>/step2_phenology.json or
    pipeline_results.json). For every site-year listed, the PhenoCam NDVI 3-day
    series is refetched and saved as a labelled plot (with the cached divergence
-   score) to validation_pipeline/output/<json_stem>/.
+   score) to plotting_pipeline/output/<json_stem>/.
 2. GBOV_<year>/ (or GoldenSites_<year>/) subfolders of satellite GVF text files.
    Each GVF file is plotted against its PhenoCam GCC and NDVI curves to
-   validation_pipeline/output/<folder_name>/.
-
-Use --table <folder> to skip plotting and only write a scores CSV for that
-folder (GVF-vs-GCC, GVF-vs-NDVI, GCC-vs-NDVI), e.g.:
-
-    python3 main.py --table GBOV_2023
-    python3 main.py --table GBOV_2023 --show
-    python3 main.py --table GBOV_2023 --top 10 --sort gvf_vs_ndvi_div
+   plotting_pipeline/output/<folder_name>/.
 
 Run with:
-    cd validation_pipeline && python3 main.py
+    cd plotting_pipeline && python3 main.py
     python3 main.py --limit 5
     python3 main.py --gvf GBOV_2023
 """
@@ -27,17 +20,11 @@ import argparse
 import sys
 from pathlib import Path
 
-# repo root for shared package imports
+# shared package imports
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-from shared.data_collection import (  # noqa: E402
-	collect_folder,
-	group_summary,
-	load_table,
-	top_n,
-)
-from shared.plot_json import plot_from_results  # noqa: E402
-from shared.plot_satellite import plot_satellite_folder  # noqa: E402
+from shared.plot_json import plot_from_results  
+from shared.plot_satellite import plot_satellite_folder 
 
 BASE_DIR = Path(__file__).resolve().parent
 INPUT_DIR = BASE_DIR / "input"
@@ -127,100 +114,25 @@ def plot_satellite_vs_phenocam(
 	return written
 
 
-def build_scores_table(
-	folder: str | Path,
-	input_dir: Path = INPUT_DIR,
-	output_dir: Path = OUTPUT_DIR,
-	limit: int | None = None,
-	show: bool = False,
-	top: int | None = None,
-	sort: str = "gvf_vs_ndvi_div",
-) -> Path:
-	"""Recompute agreement scores for one GVF folder and save a CSV table.
-
-	Does not plot. Writes output_dir/<folder>/<folder>_scores.csv. With `show`,
-	prints the full table; with `top`, prints the best `top` rows by `sort`
-	(lowest divergence first) plus a veg-type group summary.
-	"""
-	print(f"\n=== scores table: {folder} ===")
-	csv_path = collect_folder(folder, input_dir, output_dir, limit=limit)
-	df = load_table(csv_path)
-
-	preview_n = top if top is not None else (len(df) if show else min(10, len(df)))
-	if preview_n > 0 and not df.empty:
-		preview = top_n(df, by=sort, n=preview_n, ascending=True)
-		cols = [
-			"site", "veg", "year",
-			"gvf_vs_gcc_div", "gvf_vs_gcc_gap", "gvf_vs_gcc_dtw",
-			"gvf_vs_ndvi_div", "gvf_vs_ndvi_gap", "gvf_vs_ndvi_dtw",
-			"gcc_vs_ndvi_div", "gcc_vs_ndvi_gap", "gcc_vs_ndvi_dtw",
-		]
-		cols = [c for c in cols if c in preview.columns]
-		print(f"\nTop {len(preview)} by {sort} (lower = better):")
-		print(preview[cols].to_string(index=False, float_format=lambda x: f"{x:.2f}"))
-		if show or top is not None:
-			print("\nMean by veg:")
-			print(group_summary(df, by="veg").to_string(index=False, float_format=lambda x: f"{x:.2f}"))
-
-	print(f"\nCSV: {csv_path}")
-	return csv_path
-
-
 def parse_args() -> argparse.Namespace:
-	"""Parse CLI arguments (limit, input/output, gvf plot folder, or --table)."""
+	"""Parse CLI arguments (limit, input/output, optional GVF folder)."""
 	parser = argparse.ArgumentParser(
-		description="Plot NDVI/GCC/GVF series or collect agreement scores into a CSV table."
+		description="Plot NDVI/GCC/GVF series for plotting_pipeline/input/."
 	)
-	parser.add_argument("--limit", type=int, default=None, help="Max site-years to plot/score per JSON/folder (default: all).")
+	parser.add_argument("--limit", type=int, default=None, help="Max site-years to plot per JSON/folder (default: all).")
 	parser.add_argument("--input", type=Path, default=INPUT_DIR, help="Folder of results JSONs / GVF folders.")
-	parser.add_argument("--output", type=Path, default=OUTPUT_DIR, help="Folder for the plot/CSV subfolders.")
+	parser.add_argument("--output", type=Path, default=OUTPUT_DIR, help="Folder for the plot subfolders.")
 	parser.add_argument(
 		"--gvf",
 		type=str,
 		default=None,
 		help="Plot only this GVF folder (e.g. GBOV_2023). Default: every GVF folder under --input.",
 	)
-	parser.add_argument(
-		"--table",
-		type=str,
-		default=None,
-		help="Skip plotting; collect scores CSV for this folder only (e.g. GBOV_2023).",
-	)
-	parser.add_argument(
-		"--show",
-		action="store_true",
-		help="With --table, print the full ranked table and veg group summary in the terminal.",
-	)
-	parser.add_argument(
-		"--top",
-		type=int,
-		default=None,
-		help="With --table, print only the top N rows (lowest divergence) plus veg summary.",
-	)
-	parser.add_argument(
-		"--sort",
-		type=str,
-		default="gvf_vs_ndvi_div",
-		help="With --table, column to rank by (default: gvf_vs_ndvi_div). Lower = better.",
-	)
 	return parser.parse_args()
 
 
 def main() -> None:
 	args = parse_args()
-	if args.table:
-		# scores CSV only; no PNG / JSON plotting
-		build_scores_table(
-			args.table,
-			args.input,
-			args.output,
-			limit=args.limit,
-			show=args.show,
-			top=args.top,
-			sort=args.sort,
-		)
-		return
-
 	plot_all(args.input, args.output, limit=args.limit)
 	if args.gvf:
 		plot_satellite_vs_phenocam(args.gvf, args.input, args.output, limit=args.limit)

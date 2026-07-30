@@ -12,7 +12,7 @@
   - plot_from_results(json): plots every site-year in a pipeline results / step2
     JSON (re-fetches the curves from PhenoCam, reuses the cached scores).
 
-Run with:  python3 prep/api/main.py
+Run with:  python3 prep_pipeline/api/main.py
 """
 
 import json
@@ -24,7 +24,7 @@ from pathlib import Path
 
 import pandas as pd
 
-# Run with:  cd prep/api && python3 main.py
+# Run with:  cd prep_pipeline/api && python3 main.py
 # repo root for shared package imports
 sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 
@@ -402,7 +402,7 @@ def plot_from_results(
 	output_dir: Path = OUTPUT_DIR,
 	limit: int | None = None,
 ) -> list[Path]:
-	"""Plot every site-year in a results JSON to output/api (defaults to prep).
+	"""Plot every site-year in a results JSON to output/api (defaults to prep_pipeline).
 
 	Thin wrapper over shared.plot_json.plot_from_results; see that function for
 	the accepted JSON formats (step2_phenology.json / pipeline_results.json).

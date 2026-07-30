@@ -3,11 +3,11 @@ __pycache__/
 .DS_Store
 
 #this is where the api plots are saved, ignore generated plots
-prep/output/api/*
-!prep/output/api/.gitkeep
+prep_pipeline/output/api/*
+!prep_pipeline/output/api/.gitkeep
 
 #validation stage plots (regenerated from the input JSONs); keep input JSONs
-validation_pipeline/output/
+plotting_pipeline/output/
 
 
 #personal notes

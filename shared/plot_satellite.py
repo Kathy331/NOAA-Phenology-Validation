@@ -2,13 +2,13 @@
 
 The GBOV network ships a daily satellite Green Vegetation Fraction (GVF) series
 as plain text files (`YYYYMMDD,GVF`, GVF an integer 0-100) under folders like
-validation_pipeline/input/GBOV_2023/. GCC and NDVI are not in those files, so
+plotting_pipeline/input/GBOV_2023/. GCC and NDVI are not in those files, so
 they are refetched from PhenoCam (same source as shared.plot_json) using the ROI
 recorded for each GBOV site.
 
 Each plot overlays all three curves (GVF + GCC + NDVI), draws SOS/MOS/DOS/EOS
 markers for each, and annotates freshly computed GVF vs GCC and GVF vs NDVI
-agreement scores. Used by validation_pipeline/main.py to render the GBOV_<year>
+agreement scores. Used by plotting_pipeline/main.py to render the GBOV_<year>
 input folders.
 """
 
@@ -24,7 +24,7 @@ from .plot_json import resolve_roi
 from .plotting import create_satellite_plot, save_plot
 
 REPO_DIR = Path(__file__).resolve().parents[1]
-GBOV_CLEAN_JSON = REPO_DIR / "prep" / "output" / "api" / "site_GBOV_clean.json"
+GBOV_CLEAN_JSON = REPO_DIR / "prep_pipeline" / "output" / "api" / "site_GBOV_clean.json"
 
 
 def load_gvf(txt_path: str | Path) -> pd.DataFrame:

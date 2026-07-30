@@ -30,7 +30,7 @@ from .phenocam_api import (
 	load_timeseries,
 )
 
-# reads/writes the data prep JSONs under prep/output/api
+# reads/writes the data prep JSONs under prep_pipeline/output/api
 REPO_DIR = Path(__file__).resolve().parent.parent
 
 YEAR = 2024  # year to compare NDVI vs GCC (may pass in any year w/ function: site_agreement_score(timeseries, year))
@@ -39,8 +39,8 @@ CANDIDATE_GAP_DAYS = 14 						 # divergence score scaling factor
 MIN_POINTS = 10 								 # minimum number of samples, otherwise score is NaN
 MAX_WORKERS = 20 
 
-YEAR_CHECK_JSON = REPO_DIR / "prep" / "output" / "api" / "year_check.json"
-OUTPUT_JSON = REPO_DIR / "prep" / "output" / "api" / "site_ranking.json"
+YEAR_CHECK_JSON = REPO_DIR / "prep_pipeline" / "output" / "api" / "year_check.json"
+OUTPUT_JSON = REPO_DIR / "prep_pipeline" / "output" / "api" / "site_ranking.json"
 
  
 # Phenophase date comparison (CCRmax, via PhenoloDates.compute_phases)
@@ -243,7 +243,7 @@ def load_candidate_names() -> list[str]:
 	"""roi_names with both 2023 and 2024 data, from year_check.json."""
 	if not YEAR_CHECK_JSON.exists():
 		raise FileNotFoundError(
-			f"{YEAR_CHECK_JSON} not found; run prep/api/api_year_check.py first to generate it."
+			f"{YEAR_CHECK_JSON} not found; run prep_pipeline/api/api_year_check.py first to generate it."
 		)
 	data = json.loads(YEAR_CHECK_JSON.read_text())
 	return data["has_both_2023_and_2024"]

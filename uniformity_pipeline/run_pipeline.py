@@ -5,7 +5,7 @@
                               ->  Step 2: reuse cached NDVI vs GCC scores on survivors
                               ->  pipeline_results.json (survivors ranked by divergence)
 
-The input is the pre-computed site_metadata_clean.json (produced by prep/api/main.py),
+The input is the pre-computed site_metadata_clean.json (produced by prep_pipeline/api/main.py),
 so the pipeline makes no live PhenoCam calls; only Earth Engine (Step 1) hits the
 network. Set PIPELINE_LIMIT=<N> to only process the first N site-years.
 

@@ -25,33 +25,39 @@ package imports with no extra step --> just run the commands below.
   - `phenocam_api.py` - PhenoCam metadata + 3 day summary fetch/parse
   - `DynamicTimeWrap.py` - NDVI vs GCC agreement scoring (gap + DTW -> divergence)
   - `plotting.py` - matplotlib time series figures with phase markers
-- `prep/api/` - **Stage 1: data prep.** `api_year_check.py` finds sites with
+- `prep_pipeline/api/` - **Stage 1: data prep.** `api_year_check.py` finds sites with
   2023/2024 data (`year_check.json`); `main.py` scores each site-year and writes
-  the metadata JSONs. Outputs go to `prep/output/api/`.
+  the metadata JSONs. Outputs go to `prep_pipeline/output/api/`.
 - `uniformity_pipeline/` - **Stage 2: uniformity + phenology screening** (Earth
   Engine uniformity, then NDVI vs GCC phenology agreement). Reads a pre computed
   metadata snapshot, so it makes no live PhenoCam calls. Outputs go to
   `uniformity_pipeline/output/<run>/`.
-- `validation_pipeline/` - **Stage 3: plotting.** Drop a screening results JSON
-  into `validation_pipeline/input/`; `main.py` re-fetches each site's PhenoCam
+- `plotting_pipeline/` - **Stage 3: plotting.** Drop a screening results JSON
+  into `plotting_pipeline/input/`; `main.py` re-fetches each site's PhenoCam
   curves and saves a labelled NDVI/GCC plot per site-year to
-  `validation_pipeline/output/<json_stem>/`. It also plots satellite GVF: drop
+  `plotting_pipeline/output/<json_stem>/`. It also plots satellite GVF: drop
   `GBOV_<year>/` folders of GVF text files into `input/` and each is overlaid
-  with its PhenoCam GCC/NDVI curves in `validation_pipeline/output/<folder>/`.
+  with its PhenoCam GCC/NDVI curves in `plotting_pipeline/output/<folder>/`.
+- `anomaly_pipeline/` - **Stage 4: anomaly check.** Notebook builds scores CSVs
+  (from GVF inputs + PhenoCam), gap-by-veg boxplots, and the golden-standard
+  ranking. Artifacts go to `anomaly_pipeline/output/` (`metadata/` for
+  scores CSVs, `boxplot/`, and `golden_standard_ranking.csv`).
 - `test/` - loads CSVs from `test/data/ex--/`, runs phase detection and plots via
   `shared.plotting`. Outputs go to `test/output/`.
 
 ### Data flow
 
 ```
-prep/api (prep)  ->  prep/output/api/site_metadata_clean.json
+prep_pipeline (prep)  ->  prep_pipeline/output/api/site_metadata_clean.json
                   ->  copy into uniformity_pipeline/input/  (frozen snapshot)
                   ->  uniformity_pipeline (screening)  ->  uniformity_pipeline/output/<run>/
-                  ->  copy a results JSON into validation_pipeline/input/
-                  ->  validation_pipeline (plots)  ->  validation_pipeline/output/<json_stem>/
+                  ->  copy a results JSON into plotting_pipeline/input/
+                  ->  plotting_pipeline (plots)  ->  plotting_pipeline/output/<json_stem>/
+                  ->  anomaly_pipeline (scores / ranking / boxplots)
+                       ->  anomaly_pipeline/output/
 ```
 
-Stage 1 writes `site_metadata_clean.json` under `prep/output/api/`; copy that file
+Stage 1 writes `site_metadata_clean.json` under `prep_pipeline/output/api/`; copy that file
 into `uniformity_pipeline/input/` to hand it to Stage 2.
 
 ## Run plots part 1 (local files)
@@ -66,16 +72,16 @@ The script rn loops over every `test/data/ex--/` folder that contains one `*_ndv
 - `test/output/ex2.png`
 - ....
 
-## Run the data-prep stage (`prep/api/`, live from the PhenoCam API)
+## Run the data-prep stage (`prep_pipeline/api/`, live from the PhenoCam API)
 ```bash
-cd prep/api
-python3 api_year_check.py   # -> prep/output/api/year_check.json
-python3 main.py             # scores site-years -> prep/output/api/site_metadata*.json
+cd prep_pipeline/api
+python3 api_year_check.py   # -> prep_pipeline/output/api/year_check.json
+python3 main.py             # scores site-years -> prep_pipeline/output/api/site_metadata*.json
 ```
 
 `main.py` exposes helpers you can toggle in its `main()` (e.g. `build_site_metadata`,
 `build_gbov_metadata`, `plot_site`). Plots are written as
-`prep/output/api/<roi>_<year>.png`.
+`prep_pipeline/output/api/<roi>_<year>.png`.
 
 ## Run the screening pipeline (`uniformity_pipeline/`)
 
@@ -110,7 +116,7 @@ python3 run_pipeline.py     # run ALL site years -> uniformity_pipeline/output/
 PIPELINE_OUTDIR=output/Full python3 run_pipeline.py
 # example: loose GBOV run into output/GBOV_loose
 CV_MAX=0.2 WATER_MAX=0.10 NONVEG_MAX=0.10 \
-  PIPELINE_INPUT=../prep/output/api/site_GBOV_clean.json \
+  PIPELINE_INPUT=../prep_pipeline/output/api/site_GBOV_clean.json \
   PIPELINE_TAG=GBOV PIPELINE_OUTDIR=output/GBOV_loose python3 run_pipeline.py
 ```
 
@@ -131,20 +137,20 @@ Notes:
 - A full run makes several Earth Engine calls per site, can take a while.
 - Tune `STEP1_WORKERS` and thresholds in `uniformity_pipeline/config.py`.
 
-## Run the validation plots (`validation_pipeline/`)
+## Run the plotting stage (`plotting_pipeline/`)
 
 Copy any screening results JSON (e.g. a run's `step2_phenology.json` or
-`pipeline_results.json`) into `validation_pipeline/input/`, then:
+`pipeline_results.json`) into `plotting_pipeline/input/`, then:
 
 ```bash
-cd validation_pipeline
+cd plotting_pipeline
 python3 main.py             # plot every site-year in each input JSON
 python3 main.py --limit 5   # quick preview: first 5 site-years per file
 ```
 
 Those JSONs store only names/years/scores (not the curves), so `main.py`
 re-fetches each site's PhenoCam NDVI/GCC series and saves a labelled plot (with
-the cached divergence score) to `validation_pipeline/output/<json_stem>/`. The
+the cached divergence score) to `plotting_pipeline/output/<json_stem>/`. The
 fetch + plot logic lives in `shared/plot_json.py` (which reuses
 `shared/plotting.py`), so the prep stage and this stage share one code path.
 
@@ -153,29 +159,19 @@ fetch + plot logic lives in `shared/plot_json.py` (which reuses
 To compare the ground camera against satellite greenness, drop the GBOV Green
 Vegetation Fraction folders (e.g. `GBOV_2023/`, `GBOV_2024/`, each holding
 `<SITE>.ops_GVF*_timeseries.txt` files of `YYYYMMDD,GVF`) into
-`validation_pipeline/input/`. The same `python3 main.py` run detects those
+`plotting_pipeline/input/`. The same `python3 main.py` run detects those
 folders (year inferred from the folder name), fetches each GBOV site's PhenoCam
 GCC/NDVI curves, and saves a three-curve plot (GVF + GCC + NDVI) with SOS/MOS/
 DOS/EOS markers for all three and freshly computed GVF-vs-GCC / GVF-vs-NDVI
-agreement scores to `validation_pipeline/output/<folder>/`. That logic lives in
+agreement scores to `plotting_pipeline/output/<folder>/`. That logic lives in
 `shared/plot_satellite.py`.
 
-### Scores table (CSV)
+### Anomaly check (scores + golden ranking)
 
-To store GVF/GCC/NDVI agreement scores in a table (without
-replotting), run:
-
-```bash
-cd validation_pipeline
-python3 main.py --table GBOV_2023
-python3 main.py --table GBOV_2023 --show
-python3 main.py --table GBOV_2023 --top 10 --sort gvf_vs_ndvi_div
-```
-
-This writes `validation_pipeline/output/<folder>/<folder>_scores.csv` with site,
-veg, year, SOS/MOS/DOS/EOS (DOY) for GVF/GCC/NDVI, and divergence / gap / DTW
-for GVF-vs-GCC, GVF-vs-NDVI, and GCC-vs-NDVI. Open the CSV in Excel/Numbers, or
-load it with pandas to group and rank. Logic lives in `shared/data_collection.py`.
+Open [`anomaly_pipeline/anomaly_check.ipynb`](anomaly_pipeline/anomaly_check.ipynb)
+to build scores CSVs, gap-by-veg boxplots, and the golden-standard ranking
+(`shared/data_collection.py`). Scores go to `anomaly_pipeline/output/metadata/`;
+ranking and boxplots go to `anomaly_pipeline/output/`.
 
 ## Testing:
 

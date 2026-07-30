@@ -1,6 +1,6 @@
 """Shared library for the NOAA phenology validation project.
 
-used by both the data prep stage (``prep/api``) and the screening stage (``pipeline``).
+used by both the data prep stage (``prep_pipeline/api``) and the screening stage (``pipeline``).
 
   - ``PhenoloDates``   : CCRmax phenophase date detection (SOS/MOS/DOS/EOS)
   - ``phenocam_api``   : PhenoCam metadata + 3 day summary fetch/parse helpers

@@ -6,7 +6,7 @@ DOS/EOS (DOY) for GVF, GCC, and NDVI, plus GVF-vs-GCC, GVF-vs-NDVI, and
 GCC-vs-NDVI divergence / phenophase gap / DTW-per-step so you can sort, group,
 and rank sites later with pandas.
 
-Used by validation_pipeline/main.py via ``--table GBOV_2023``.
+Used by anomaly_pipeline/anomaly_check.ipynb.
 """
 
 from __future__ import annotations
@@ -131,20 +131,20 @@ def score_one(
 def collect_folder(
 	folder: str | Path,
 	input_dir: str | Path,
-	output_dir: str | Path,
+	anomaly_dir: str | Path,
 	year: int | None = None,
 	limit: int | None = None,
 ) -> Path:
 	"""Score every GVF file in one input folder and write a CSV table.
 
 	`folder` may be a bare name under `input_dir` (e.g. GBOV_2023) or a path.
-	Writes `output_dir/<folder_name>/<folder_name>_scores.csv` and returns that
+	Writes ``anomaly_dir/metadata/<folder_name>_scores.csv`` and returns that
 	path. Year is inferred from the folder name unless given. Failures are
 	skipped with a message (same style as plot_satellite_folder).
 	"""
 	folder = Path(folder)
 	input_dir = Path(input_dir)
-	output_dir = Path(output_dir)
+	meta = metadata_dir(anomaly_dir)
 
 	src = folder if folder.is_dir() else input_dir / folder
 	if not src.is_dir():
@@ -185,9 +185,8 @@ def collect_folder(
 		frame = frame.sort_values("gvf_vs_ndvi_div", ascending=True, na_position="last")
 		frame = frame.reset_index(drop=True)
 
-	dest_dir = output_dir / src.name
-	dest_dir.mkdir(parents=True, exist_ok=True)
-	csv_path = dest_dir / f"{src.name}_scores.csv"
+	meta.mkdir(parents=True, exist_ok=True)
+	csv_path = meta / f"{src.name}_scores.csv"
 	frame.to_csv(csv_path, index=False)
 	print(f"\nWrote {len(frame)}/{len(files)} rows to {csv_path}")
 	return csv_path
@@ -217,3 +216,200 @@ def group_summary(df: pd.DataFrame, by: str = "veg") -> pd.DataFrame:
 	if by not in df.columns:
 		raise KeyError(f"Unknown group column {by!r}")
 	return df.groupby(by, dropna=False)[metrics].mean().reset_index()
+
+
+def load_all_scores(anomaly_dir: str | Path) -> pd.DataFrame:
+	"""Concatenate every ``*_scores.csv`` under ``anomaly_dir/metadata/``."""
+	meta = metadata_dir(anomaly_dir)
+	paths = sorted(meta.glob("*_scores.csv"))
+	if not paths:
+		raise FileNotFoundError(f"No *_scores.csv under {meta}/")
+	frames = []
+	for path in paths:
+		frame = pd.read_csv(path)
+		frame["source"] = path.stem.removesuffix("_scores")
+		frames.append(frame)
+	return pd.concat(frames, ignore_index=True)
+
+
+def anomaly_output_dir(start: str | Path | None = None) -> Path:
+	"""``anomaly_pipeline/output`` under the repo root.
+
+	``start`` may be the repo, ``anomaly_pipeline``, ``output``, or any
+	path under the repo (walks parents until ``shared/`` is found).
+	"""
+	p = Path(start).resolve() if start is not None else Path.cwd().resolve()
+	for candidate in [p, *p.parents]:
+		if (candidate / "shared").is_dir():
+			return candidate / "anomaly_pipeline" / "output"
+		if candidate.name == "output" and candidate.parent.name == "anomaly_pipeline":
+			return candidate
+	raise FileNotFoundError(f"Could not locate repo root from {p}")
+
+
+def metadata_dir(anomaly_dir: str | Path | None = None) -> Path:
+	"""``anomaly_pipeline/output/metadata`` (scores CSVs)."""
+	base = Path(anomaly_dir) if anomaly_dir is not None else anomaly_output_dir()
+	# accept either output or already-metadata
+	if base.name == "metadata":
+		return base
+	return Path(base) / "metadata"
+
+
+def build_golden_ranking(
+	anomaly_dir: str | Path,
+	out_csv: str | Path | None = None,
+	exclude_spinup: bool = True,
+) -> Path:
+	"""Rank site-years by combined GVF gap+DTW; mark DB golden-standard candidates.
+
+	Combined score = mean of GVF-vs-GCC and GVF-vs-NDVI divergence
+	(each divergence is already phenophase_gap / 14 + dtw_per_step). Spin-up
+	sites (``gvf_sos == 1``) are dropped by default. DB rows get
+	``golden_candidate=True`` as the closed-canopy control-group pool.
+
+	Reads scores from ``anomaly_dir/metadata/*_scores.csv``. Writes
+	``anomaly_dir/golden_standard_ranking.csv`` unless ``out_csv`` is given.
+	"""
+	anomaly_dir = Path(anomaly_dir)
+	df = load_all_scores(anomaly_dir)
+	df["spin_up"] = df["gvf_sos"].eq(1.0) if "gvf_sos" in df.columns else False
+
+	ranked = df.copy()
+	if exclude_spinup:
+		ranked = ranked.loc[~ranked["spin_up"]].copy()
+
+	ranked["combined_div"] = ranked[["gvf_vs_gcc_div", "gvf_vs_ndvi_div"]].mean(axis=1)
+	ranked["combined_gap"] = ranked[["gvf_vs_gcc_gap", "gvf_vs_ndvi_gap"]].mean(axis=1)
+	ranked["combined_dtw"] = ranked[["gvf_vs_gcc_dtw", "gvf_vs_ndvi_dtw"]].mean(axis=1)
+	ranked["golden_candidate"] = ranked["veg"].eq("DB")
+
+	ranked = ranked.sort_values("combined_div", ascending=True, na_position="last")
+	ranked = ranked.reset_index(drop=True)
+	ranked.insert(0, "rank", ranked.index + 1)
+
+	cols = [
+		"rank", "site", "roi", "veg", "year", "source",
+		"golden_candidate", "spin_up",
+		"combined_div", "combined_gap", "combined_dtw",
+		"gvf_vs_ndvi_div", "gvf_vs_ndvi_gap", "gvf_vs_ndvi_dtw",
+		"gvf_vs_gcc_div", "gvf_vs_gcc_gap", "gvf_vs_gcc_dtw",
+		"gcc_vs_ndvi_div", "gcc_vs_ndvi_gap", "gcc_vs_ndvi_dtw",
+		"gvf_sos", "gvf_mos", "gvf_dos", "gvf_eos",
+		"gcc_sos", "gcc_mos", "gcc_dos", "gcc_eos",
+		"ndvi_sos", "ndvi_mos", "ndvi_dos", "ndvi_eos",
+	]
+	cols = [c for c in cols if c in ranked.columns]
+	ranked = ranked[cols]
+
+	out_csv = Path(out_csv) if out_csv is not None else anomaly_dir / "golden_standard_ranking.csv"
+	out_csv.parent.mkdir(parents=True, exist_ok=True)
+	ranked.to_csv(out_csv, index=False)
+
+	n_db = int(ranked["golden_candidate"].sum()) if "golden_candidate" in ranked.columns else 0
+	print(f"Ranked {len(ranked)} site-years ({n_db} DB golden candidates); excluded spin-up={exclude_spinup}")
+	print(f"Wrote {out_csv}")
+	return out_csv
+
+
+def plot_gap_boxplot_by_veg(
+	scores_csv: str | Path,
+	anomaly_dir: str | Path,
+	out_png: str | Path | None = None,
+	title: str | None = None,
+) -> Path:
+	"""Boxplot of ``gvf_vs_ndvi_gap`` by veg; spin-up (``gvf_sos == 1``) as red diamonds.
+
+	Writes under ``anomaly_dir/boxplot/<folder>_BOXPLOT.png`` by default (folder
+	name taken from the scores CSV stem, e.g. GoldenSites_2023_scores ->
+	GoldenSites_2023_BOXPLOT.png).
+	"""
+	import matplotlib
+
+	matplotlib.use("Agg")
+	import matplotlib.pyplot as plt
+	from matplotlib.lines import Line2D
+	import numpy as np
+
+	scores_csv = Path(scores_csv)
+	df = pd.read_csv(scores_csv)
+	if "gvf_sos" not in df.columns or "gvf_vs_ndvi_gap" not in df.columns:
+		raise ValueError(f"{scores_csv} needs gvf_sos and gvf_vs_ndvi_gap columns")
+
+	spin = df[df["gvf_sos"] == 1.0]
+	normal = df[df["gvf_sos"] != 1.0]
+	folder = scores_csv.stem.removesuffix("_scores")
+	if out_png is None:
+		out_png = Path(anomaly_dir) / "boxplot" / f"{folder}_BOXPLOT.png"
+	out_png = Path(out_png)
+	out_png.parent.mkdir(parents=True, exist_ok=True)
+
+	if len(normal):
+		veg_order = (
+			normal.groupby("veg")["gvf_vs_ndvi_gap"].median().sort_values().index.tolist()
+		)
+	else:
+		veg_order = []
+	for v in sorted(df["veg"].dropna().unique()):
+		if v not in veg_order:
+			veg_order.append(v)
+
+	fig, ax = plt.subplots(figsize=(9, 5.5))
+	positions = np.arange(1, len(veg_order) + 1)
+	data = [normal.loc[normal["veg"] == v, "gvf_vs_ndvi_gap"].dropna().values for v in veg_order]
+	ax.boxplot(
+		data,
+		positions=positions,
+		widths=0.55,
+		patch_artist=True,
+		showfliers=False,
+		medianprops={"color": "#1a1a1a", "linewidth": 1.5},
+		whiskerprops={"color": "#555555"},
+		capprops={"color": "#555555"},
+		boxprops={"facecolor": "#a6cee3", "edgecolor": "#555555", "alpha": 0.85},
+	)
+
+	rng = np.random.default_rng(42)
+	other_labeled = spin_labeled = False
+	for i, v in enumerate(veg_order):
+		x0 = positions[i]
+		n = normal.loc[normal["veg"] == v]
+		s = spin.loc[spin["veg"] == v]
+		if len(n):
+			ax.scatter(
+				x0 + rng.uniform(-0.12, 0.12, size=len(n)),
+				n["gvf_vs_ndvi_gap"],
+				s=36, c="#333333", zorder=3,
+				label="other sites" if not other_labeled else None,
+				edgecolors="white", linewidths=0.4,
+			)
+			other_labeled = True
+		if len(s):
+			ax.scatter(
+				x0 + rng.uniform(-0.12, 0.12, size=len(s)),
+				s["gvf_vs_ndvi_gap"],
+				s=70, c="#e41a1c", zorder=4, marker="D",
+				label="spin-up (GVF SOS = DOY 1)" if not spin_labeled else None,
+				edgecolors="white", linewidths=0.6,
+			)
+			spin_labeled = True
+
+	ax.legend(
+		handles=[
+			Line2D([0], [0], marker="o", color="w", markerfacecolor="#333333", markersize=8, label="other sites"),
+			Line2D([0], [0], marker="D", color="w", markerfacecolor="#e41a1c", markersize=9, label="spin-up (GVF SOS = DOY 1)"),
+		],
+		loc="upper left",
+		frameon=True,
+	)
+	ax.set_xticks(positions)
+	ax.set_xticklabels(veg_order)
+	ax.set_xlabel("Vegetation type")
+	ax.set_ylabel("GVF vs NDVI phenophase gap (days)")
+	ax.set_title(title or f"{folder}: GVF-NDVI gap by land type (n_spinup={len(spin)})")
+	ax.grid(True, axis="y", alpha=0.3)
+	fig.tight_layout()
+	fig.savefig(out_png, dpi=200, bbox_inches="tight")
+	plt.close(fig)
+	print(f"Wrote {out_png}")
+	return out_png
