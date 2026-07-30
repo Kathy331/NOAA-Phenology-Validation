@@ -160,6 +160,23 @@ DOS/EOS markers for all three and freshly computed GVF-vs-GCC / GVF-vs-NDVI
 agreement scores to `validation_pipeline/output/<folder>/`. That logic lives in
 `shared/plot_satellite.py`.
 
+### Scores table (CSV)
+
+To store GVF/GCC/NDVI agreement scores in a table (without
+replotting), run:
+
+```bash
+cd validation_pipeline
+python3 main.py --table GBOV_2023
+python3 main.py --table GBOV_2023 --show
+python3 main.py --table GBOV_2023 --top 10 --sort gvf_vs_ndvi_div
+```
+
+This writes `validation_pipeline/output/<folder>/<folder>_scores.csv` with site,
+veg, year, SOS/MOS/DOS/EOS (DOY) for GVF/GCC/NDVI, and divergence / gap / DTW
+for GVF-vs-GCC, GVF-vs-NDVI, and GCC-vs-NDVI. Open the CSV in Excel/Numbers, or
+load it with pandas to group and rank. Logic lives in `shared/data_collection.py`.
+
 ## Testing:
 
 Set the preferred year at the top of `test/test.py` (`YEAR = 2024`).
