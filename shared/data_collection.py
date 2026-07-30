@@ -69,6 +69,58 @@ def _pack_phases(prefix: str, phases: dict) -> dict[str, float]:
 	return {f"{prefix}_{phase.lower()}": phases.get(phase) for phase in PHASE_KEYS}
 
 
+def _round4(value: float | None) -> float | None:
+	return None if value is None else round(float(value), 4)
+
+
+def _add_lag_compression(row: dict) -> dict:
+	"""Add ``lag``, ``greenup_comp``, and ``senescence_comp`` (ratios to 4 decimals)."""
+	gvf_sos = row.get("gvf_sos")
+	ndvi_sos = row.get("ndvi_sos")
+	gvf_mos = row.get("gvf_mos")
+	gcc_sos = row.get("gcc_sos")
+	gcc_mos = row.get("gcc_mos")
+	gvf_dos = row.get("gvf_dos")
+	gvf_eos = row.get("gvf_eos")
+	gcc_dos = row.get("gcc_dos")
+	gcc_eos = row.get("gcc_eos")
+
+	lag = None
+	if gvf_sos is not None and ndvi_sos is not None:
+		lag = float(gvf_sos) - float(ndvi_sos)
+
+	greenup_comp = None
+	if (
+		gvf_sos is not None and gvf_mos is not None
+		and gcc_sos is not None and gcc_mos is not None
+	):
+		gcc_greenup = float(gcc_mos) - float(gcc_sos)
+		if gcc_greenup != 0:
+			greenup_comp = (float(gvf_mos) - float(gvf_sos)) / gcc_greenup
+
+	senescence_comp = None
+	if (
+		gvf_dos is not None and gvf_eos is not None
+		and gcc_dos is not None and gcc_eos is not None
+	):
+		gcc_sen = float(gcc_eos) - float(gcc_dos)
+		if gcc_sen != 0:
+			senescence_comp = (float(gvf_eos) - float(gvf_dos)) / gcc_sen
+
+	row["lag"] = _round4(lag)
+	row["greenup_comp"] = _round4(greenup_comp)
+	row["senescence_comp"] = _round4(senescence_comp)
+	return row
+
+
+def _order_score_columns(frame: pd.DataFrame) -> pd.DataFrame:
+	"""Put ``lag``, ``greenup_comp``, ``senescence_comp`` immediately after ``site``."""
+	preferred = ["site", "lag", "greenup_comp", "senescence_comp", "roi", "veg", "year"]
+	front = [c for c in preferred if c in frame.columns]
+	rest = [c for c in frame.columns if c not in front]
+	return frame[front + rest]
+
+
 def score_one(
 	txt_path: str | Path,
 	year: int,
@@ -125,7 +177,7 @@ def score_one(
 	row.update(_pack("gvf_vs_gcc", gvf_vs_gcc))
 	row.update(_pack("gvf_vs_ndvi", gvf_vs_ndvi))
 	row.update(_pack("gcc_vs_ndvi", gcc_vs_ndvi))
-	return row
+	return _add_lag_compression(row)
 
 
 def collect_folder(
@@ -184,12 +236,38 @@ def collect_folder(
 		# lowest GVF-NDVI divergence first (best agreement at top)
 		frame = frame.sort_values("gvf_vs_ndvi_div", ascending=True, na_position="last")
 		frame = frame.reset_index(drop=True)
+		frame = _order_score_columns(frame)
 
 	meta.mkdir(parents=True, exist_ok=True)
 	csv_path = meta / f"{src.name}_scores.csv"
 	frame.to_csv(csv_path, index=False)
 	print(f"\nWrote {len(frame)}/{len(files)} rows to {csv_path}")
 	return csv_path
+
+
+def enrich_scores_frame(df: pd.DataFrame) -> pd.DataFrame:
+	"""Ensure ``lag`` / ``greenup_comp`` / ``senescence_comp`` exist (4 decimals) after ``site``."""
+	frame = df.copy()
+	# migrate old column names if present
+	if "greenup_comp" not in frame.columns and "compression" in frame.columns:
+		frame = frame.rename(columns={"compression": "greenup_comp"})
+	if "senescence_comp" not in frame.columns and "senescence" in frame.columns:
+		frame = frame.rename(columns={"senescence": "senescence_comp"})
+	frame = frame.drop(columns=[c for c in ("compression", "senescence") if c in frame.columns], errors="ignore")
+
+	if "lag" not in frame.columns and {"gvf_sos", "ndvi_sos"} <= set(frame.columns):
+		frame["lag"] = frame["gvf_sos"] - frame["ndvi_sos"]
+	if "greenup_comp" not in frame.columns and {"gvf_sos", "gvf_mos", "gcc_sos", "gcc_mos"} <= set(frame.columns):
+		gcc_greenup = frame["gcc_mos"] - frame["gcc_sos"]
+		frame["greenup_comp"] = (frame["gvf_mos"] - frame["gvf_sos"]) / gcc_greenup.replace(0, pd.NA)
+	if "senescence_comp" not in frame.columns and {"gvf_dos", "gvf_eos", "gcc_dos", "gcc_eos"} <= set(frame.columns):
+		gcc_sen = frame["gcc_eos"] - frame["gcc_dos"]
+		frame["senescence_comp"] = (frame["gvf_eos"] - frame["gvf_dos"]) / gcc_sen.replace(0, pd.NA)
+
+	for col in ("lag", "greenup_comp", "senescence_comp"):
+		if col in frame.columns:
+			frame[col] = pd.to_numeric(frame[col], errors="coerce").round(4)
+	return _order_score_columns(frame)
 
 
 def load_table(csv_path: str | Path) -> pd.DataFrame:
@@ -226,7 +304,7 @@ def load_all_scores(anomaly_dir: str | Path) -> pd.DataFrame:
 		raise FileNotFoundError(f"No *_scores.csv under {meta}/")
 	frames = []
 	for path in paths:
-		frame = pd.read_csv(path)
+		frame = enrich_scores_frame(pd.read_csv(path))
 		frame["source"] = path.stem.removesuffix("_scores")
 		frames.append(frame)
 	return pd.concat(frames, ignore_index=True)
@@ -289,7 +367,7 @@ def build_golden_ranking(
 	ranked.insert(0, "rank", ranked.index + 1)
 
 	cols = [
-		"rank", "site", "roi", "veg", "year", "source",
+		"rank", "site", "lag", "greenup_comp", "senescence_comp", "roi", "veg", "year", "source",
 		"golden_candidate", "spin_up",
 		"combined_div", "combined_gap", "combined_dtw",
 		"gvf_vs_ndvi_div", "gvf_vs_ndvi_gap", "gvf_vs_ndvi_dtw",
