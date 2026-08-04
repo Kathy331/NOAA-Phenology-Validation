@@ -74,20 +74,33 @@ def _round4(value: float | None) -> float | None:
 
 
 def _add_lag_compression(row: dict) -> dict:
-	"""Add ``lag``, ``greenup_comp``, and ``senescence_comp`` (ratios to 4 decimals)."""
+	"""Add phase lags (GVF−NDVI) plus greenup/senescence compression ratios.
+
+	``lag`` / ``lag_sos`` = gvf_sos − ndvi_sos (kept as ``lag`` for older callers).
+	Also ``lag_mos``, ``lag_dos``, ``lag_eos``. Compression ratios to 4 decimals.
+	"""
 	gvf_sos = row.get("gvf_sos")
 	ndvi_sos = row.get("ndvi_sos")
 	gvf_mos = row.get("gvf_mos")
+	ndvi_mos = row.get("ndvi_mos")
 	gcc_sos = row.get("gcc_sos")
 	gcc_mos = row.get("gcc_mos")
 	gvf_dos = row.get("gvf_dos")
+	ndvi_dos = row.get("ndvi_dos")
 	gvf_eos = row.get("gvf_eos")
+	ndvi_eos = row.get("ndvi_eos")
 	gcc_dos = row.get("gcc_dos")
 	gcc_eos = row.get("gcc_eos")
 
-	lag = None
-	if gvf_sos is not None and ndvi_sos is not None:
-		lag = float(gvf_sos) - float(ndvi_sos)
+	def _diff(a, b):
+		if a is None or b is None:
+			return None
+		return float(a) - float(b)
+
+	lag_sos = _diff(gvf_sos, ndvi_sos)
+	lag_mos = _diff(gvf_mos, ndvi_mos)
+	lag_dos = _diff(gvf_dos, ndvi_dos)
+	lag_eos = _diff(gvf_eos, ndvi_eos)
 
 	greenup_comp = None
 	if (
@@ -107,15 +120,25 @@ def _add_lag_compression(row: dict) -> dict:
 		if gcc_sen != 0:
 			senescence_comp = (float(gvf_eos) - float(gvf_dos)) / gcc_sen
 
-	row["lag"] = _round4(lag)
+	# ``lag`` kept as SOS alias for ranking / older notebook cells
+	row["lag"] = _round4(lag_sos)
+	row["lag_sos"] = _round4(lag_sos)
+	row["lag_mos"] = _round4(lag_mos)
+	row["lag_dos"] = _round4(lag_dos)
+	row["lag_eos"] = _round4(lag_eos)
 	row["greenup_comp"] = _round4(greenup_comp)
 	row["senescence_comp"] = _round4(senescence_comp)
 	return row
 
 
 def _order_score_columns(frame: pd.DataFrame) -> pd.DataFrame:
-	"""Put ``lag``, ``greenup_comp``, ``senescence_comp`` immediately after ``site``."""
-	preferred = ["site", "lag", "greenup_comp", "senescence_comp", "roi", "veg", "year"]
+	"""Put lag / compression columns immediately after ``site``."""
+	preferred = [
+		"site",
+		"lag", "lag_sos", "lag_mos", "lag_dos", "lag_eos",
+		"greenup_comp", "senescence_comp",
+		"roi", "veg", "year",
+	]
 	front = [c for c in preferred if c in frame.columns]
 	rest = [c for c in frame.columns if c not in front]
 	return frame[front + rest]
@@ -246,7 +269,7 @@ def collect_folder(
 
 
 def enrich_scores_frame(df: pd.DataFrame) -> pd.DataFrame:
-	"""Ensure ``lag`` / ``greenup_comp`` / ``senescence_comp`` exist (4 decimals) after ``site``."""
+	"""Ensure phase lags + compression columns exist (4 decimals) after ``site``."""
 	frame = df.copy()
 	# migrate old column names if present
 	if "greenup_comp" not in frame.columns and "compression" in frame.columns:
@@ -255,8 +278,22 @@ def enrich_scores_frame(df: pd.DataFrame) -> pd.DataFrame:
 		frame = frame.rename(columns={"senescence": "senescence_comp"})
 	frame = frame.drop(columns=[c for c in ("compression", "senescence") if c in frame.columns], errors="ignore")
 
-	if "lag" not in frame.columns and {"gvf_sos", "ndvi_sos"} <= set(frame.columns):
+	phase_lags = [
+		("lag_sos", "gvf_sos", "ndvi_sos"),
+		("lag_mos", "gvf_mos", "ndvi_mos"),
+		("lag_dos", "gvf_dos", "ndvi_dos"),
+		("lag_eos", "gvf_eos", "ndvi_eos"),
+	]
+	for out_col, gvf_col, ndvi_col in phase_lags:
+		if out_col not in frame.columns and {gvf_col, ndvi_col} <= set(frame.columns):
+			frame[out_col] = frame[gvf_col] - frame[ndvi_col]
+	# ``lag`` = SOS alias
+	if "lag_sos" in frame.columns:
+		frame["lag"] = frame["lag_sos"]
+	elif "lag" not in frame.columns and {"gvf_sos", "ndvi_sos"} <= set(frame.columns):
 		frame["lag"] = frame["gvf_sos"] - frame["ndvi_sos"]
+		frame["lag_sos"] = frame["lag"]
+
 	if "greenup_comp" not in frame.columns and {"gvf_sos", "gvf_mos", "gcc_sos", "gcc_mos"} <= set(frame.columns):
 		gcc_greenup = frame["gcc_mos"] - frame["gcc_sos"]
 		frame["greenup_comp"] = (frame["gvf_mos"] - frame["gvf_sos"]) / gcc_greenup.replace(0, pd.NA)
@@ -264,7 +301,7 @@ def enrich_scores_frame(df: pd.DataFrame) -> pd.DataFrame:
 		gcc_sen = frame["gcc_eos"] - frame["gcc_dos"]
 		frame["senescence_comp"] = (frame["gvf_eos"] - frame["gvf_dos"]) / gcc_sen.replace(0, pd.NA)
 
-	for col in ("lag", "greenup_comp", "senescence_comp"):
+	for col in ("lag", "lag_sos", "lag_mos", "lag_dos", "lag_eos", "greenup_comp", "senescence_comp"):
 		if col in frame.columns:
 			frame[col] = pd.to_numeric(frame[col], errors="coerce").round(4)
 	return _order_score_columns(frame)
@@ -367,7 +404,9 @@ def build_golden_ranking(
 	ranked.insert(0, "rank", ranked.index + 1)
 
 	cols = [
-		"rank", "site", "lag", "greenup_comp", "senescence_comp", "roi", "veg", "year", "source",
+		"rank", "site", "lag", "lag_sos", "lag_mos", "lag_dos", "lag_eos",
+		"greenup_comp", "senescence_comp", "roi", "veg", "year", "source",
+
 		"golden_candidate", "spin_up",
 		"combined_div", "combined_gap", "combined_dtw",
 		"gvf_vs_ndvi_div", "gvf_vs_ndvi_gap", "gvf_vs_ndvi_dtw",
