@@ -43,10 +43,40 @@ def load_gvf(txt_path: str | Path) -> pd.DataFrame:
 	return frame
 
 
+PLACEHOLDER_VEG = "XX"
+
+
+def normalize_site_id(raw: str) -> str:
+	"""Clean a GVF-derived site id: collapse repeated `_` and trim stray `_`.
+
+	GVF filenames sometimes carry an empty separator field (``ibp__SH_1000``) or
+	a trailing underscore (``NEON.D14.JORN.DP1.00033_GR_1000_``) that keep the id
+	from matching a PhenoCam roi_name. Collapsing runs of underscores to one and
+	stripping leading/trailing underscores restores the canonical
+	``<site>_<VEG>_<seq>`` form (PhenoCam separators are single underscores).
+	"""
+	return re.sub(r"_+", "_", raw).strip("_")
+
+
+def veg_code(site_id: str) -> str | None:
+	"""Vegetation code from a `<site>_<VEG>_<seq>` id, or None if absent.
+
+	Returns the second-to-last underscore token (``ibp_SH_1000`` -> ``SH``). Bare
+	site ids without a veg/seq suffix (e.g. ``NEON.D01.BART.DP1.00033``) return
+	None so they still resolve through the ROI map.
+	"""
+	parts = site_id.split("_")
+	return parts[-2] if len(parts) >= 3 else None
+
+
 def gvf_site_id(txt_path: str | Path) -> str:
-	"""Bare NEON site id from a GVF filename (drops the `.ops_GVF...` suffix)."""
+	"""Site id from a GVF filename (drops the `.ops_GVF...` suffix).
+
+	Also normalizes stray underscores (double/trailing) so the id matches a
+	PhenoCam roi_name (see normalize_site_id).
+	"""
 	name = Path(txt_path).name
-	return name.split(".ops_")[0]
+	return normalize_site_id(name.split(".ops_")[0])
 
 
 def bare_site_from_roi(roi_name: str) -> str:
@@ -99,6 +129,11 @@ def plot_satellite(
 	txt_path = Path(txt_path)
 	output_dir = Path(output_dir)
 	bare = gvf_site_id(txt_path)
+
+	veg = veg_code(bare)
+	if veg is not None and veg.upper() == PLACEHOLDER_VEG:
+		raise ValueError(f"{bare}: no veg code ({PLACEHOLDER_VEG} placeholder); skipping")
+
 	roi_map = roi_map if roi_map is not None else load_gbov_roi_map()
 	roi_name = roi_map.get(bare, bare)  # fall back to the bare site (resolve_roi -> find_roi)
 

@@ -18,6 +18,51 @@ from pathlib import Path
 BASE_DIR = Path(__file__).resolve().parent
 DEFAULT_INPUT = BASE_DIR / "output" / "Full_loose" / "pipeline_results.json"
 CLOSE_KM = 4.0  # two sites closer than this count as not isolated
+GOLDEN_SITE_COUNT = 40
+
+# final golden-site list. Entries with "2023/2024" expand to both years.
+GOLDEN_SITE_YEAR_SPEC = [
+	"mandani2_AG_1000 2023",
+	"bigtraillake_EN_1000 2023",
+	"arkansaswhitaker_AG_1000 2023",
+	"NEON.D02.SCBI.DP1.00033_DB_1000 2023",
+	"blueoakheadquarters_GR_1000 2023/2024",
+	"blackrockforest_DB_1000 2023",
+	"uiefmiscanthus2_AG_1000 2023/2024",
+	"dukehw_DB_1000 2023",
+	"shalehillsczo_DB_2000 2023/2024",
+	"NEON.D18.OKSR.DP1.20002_TN_1000 2024",
+	"arsope3ltar_AG_1000 2023/2024",
+	"macleish_DB_1000 2023",
+	"blackrockforest_DB_1000 2024",
+	"robinson2_DB_1000 2023",
+	"arsmorris2_AG_1000 2024",
+	"cafcookeastltar01_AG_1000 2023",
+	"NEON.D11.BLUE.DP1.20002_DB_1000 2023",
+	"willowcreek_DB_1000 2023/2024",
+	"dangermondjalama_GR_1000 2024",
+	"laupahoehoe_EB_1000 2023",
+	"segawhitepockets_GR_1000 2023",
+	"coweeta_DB_2000 2024",
+	"morganmonroe2_DB_1000 2023",
+	"ninemileprairie_DB_2000 2023",
+	"lostcreek_WL_1000 2024",
+	"grca1pj_EN_1000 2023",
+	"sweetbriar_DB_1000 2023",
+	"coweeta_DB_2000 2023",
+	"russellsage_DB_1000 2024",
+	"vallesmixedconifer_EN_1000 2023",
+	"NEON.D05.STEI.DP1.00042_UN_1000 2024",
+	"sevmettswl_SH_1000 2024",
+	"vallesmixedconifer_EN_1000 2024",
+	"usgseros_DB_2000 2023",
+	"grca1pj_EN_1000 2024",
+	"niwot3_EN_1000 2023/2024",
+	"ecb4_AG_1000 2023",
+	"turkeypointdbf_DB_2000 2023",
+	"luckyhills_SH_4000 2024",
+	"portal_SH_1000 2024",
+]
 
 
 # Site loading and value formatting
@@ -74,42 +119,82 @@ def _haversine_km(a: tuple[float, float], b: tuple[float, float]) -> float:
 
 
 def _is_in_usa(lat: float, lon: float) -> bool:
-	"""Rough US latitude test covering the CONUS, Alaska, and Hawaii bands.
-
-	Only latitude is checked (longitude is ignored), so this is a coarse filter
-	meant to match the report generator's gold row logic, not a precise boundary.
-	"""
-	return (
-		24.0 <= lat <= 50.0
-		or 51.0 <= lat <= 72.0
-		or 18.0 <= lat <= 23.5
+	"""Approximate USA bounds (CONUS, Alaska, Hawaii, Puerto Rico)."""
+	regions = (
+		(24.0, 49.5, -125.0, -66.0),   # CONUS
+		(51.0, 72.5, -170.0, -129.0),  # Alaska
+		(18.5, 22.6, -161.0, -154.0),  # Hawaii
+		(17.8, 18.6, -67.4, -65.1),    # Puerto Rico
 	)
+	return any(min_lat <= lat <= max_lat and min_lon <= lon <= max_lon for min_lat, max_lat, min_lon, max_lon in regions)
 
 
-def _is_golden_site(site: dict, all_sites: list[dict]) -> bool:
-	"""True when the site is in the USA and isolated (no other within CLOSE_KM)."""
-	lat = site.get("lat")
-	lon = site.get("lon")
-	if lat is None or lon is None or not _is_in_usa(float(lat), float(lon)):
-		return False
-	location = (float(lat), float(lon))
-	for other in all_sites:
-		if other is site:
+def _expand_site_year_spec(spec: str) -> list[tuple[str, int]]:
+	"""Expand one spec row into (site, year) tuples (supports 2023/2024 syntax)."""
+	parts = spec.rsplit(" ", 1)
+	if len(parts) != 2:
+		return []
+	name, year_token = parts[0].strip(), parts[1].strip()
+	if "/" in year_token:
+		years = [token.strip() for token in year_token.split("/")]
+	else:
+		years = [year_token]
+
+	out: list[tuple[str, int]] = []
+	for year_text in years:
+		try:
+			year_value = int(year_text)
+		except ValueError:
 			continue
-		other_lat = other.get("lat")
-		other_lon = other.get("lon")
-		if other_lat is None or other_lon is None:
+		out.append((name, year_value))
+	return out
+
+
+def _golden_site_year_keys() -> list[tuple[str, int]]:
+	"""Return ordered site/year keys from the curated golden-site spec."""
+	keys: list[tuple[str, int]] = []
+	for item in GOLDEN_SITE_YEAR_SPEC:
+		keys.extend(_expand_site_year_spec(item))
+
+	# Preserve order while removing accidental duplicates.
+	seen: set[tuple[str, int]] = set()
+	ordered: list[tuple[str, int]] = []
+	for key in keys:
+		if key in seen:
 			continue
-		if _haversine_km(location, (float(other_lat), float(other_lon))) < CLOSE_KM:
-			return False
-	return True
+		seen.add(key)
+		ordered.append(key)
+	return ordered
+
+
+def _select_golden_sites(sites: list[dict]) -> list[dict]:
+	"""Select only the user-curated golden site/year entries, in list order."""
+	by_key: dict[tuple[str, int], dict] = {}
+	for site in sites:
+		name = site.get("name")
+		year = site.get("year")
+		if name is None or year is None:
+			continue
+		try:
+			year_int = int(year)
+		except (TypeError, ValueError):
+			continue
+		by_key[(str(name), year_int)] = site
+
+	selected: list[dict] = []
+	for key in _golden_site_year_keys():
+		site = by_key.get(key)
+		if site is None:
+			continue
+		selected.append(site)
+	return selected
 
 
 def _selected_sites(sites: list[dict], golden_only: bool) -> list[dict]:
 	"""Every site, or only the golden (isolated USA) ones when golden_only."""
 	if not golden_only:
 		return sites
-	return [site for site in sites if _is_golden_site(site, sites)]
+	return _select_golden_sites(sites)
 
 
 # HTML rendering
@@ -148,7 +233,7 @@ def _build_html(sites: list[dict], title: str, *, golden_only: bool = False) -> 
 	title_text = _safe_text(title)
 	legend_label = "golden site pin" if golden_only else "site-year pin"
 	subtitle = (
-		"Golden sites only: isolated within 4 km and inside the USA."
+		"Final Golden Sites (curated list): 320 candidates reduced to the geographically diverse subset across the United States."
 		if golden_only
 		else "Each pin is one loose-threshold site-year that passed the spatial screen and was ranked by NDVI-GCC divergence."
 	)
@@ -202,6 +287,28 @@ def _build_html(sites: list[dict], title: str, *, golden_only: bool = False) -> 
       vertical-align: middle;
       background: var(--accent);
     }}
+		/* Override MarkerCluster default green bubbles for better contrast on vegetation. */
+		.marker-cluster-small {{
+			background-color: rgba(245, 158, 11, 0.36);
+		}}
+		.marker-cluster-small div {{
+			background-color: rgba(245, 158, 11, 0.7);
+			color: #1f2933;
+		}}
+		.marker-cluster-medium {{
+			background-color: rgba(234, 179, 8, 0.38);
+		}}
+		.marker-cluster-medium div {{
+			background-color: rgba(234, 179, 8, 0.74);
+			color: #1f2933;
+		}}
+		.marker-cluster-large {{
+			background-color: rgba(202, 138, 4, 0.4);
+		}}
+		.marker-cluster-large div {{
+			background-color: rgba(202, 138, 4, 0.76);
+			color: #1f2933;
+		}}
   </style>
 </head>
 <body>
