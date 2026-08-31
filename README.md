@@ -38,10 +38,14 @@ package imports with no extra step --> just run the commands below.
   `plotting_pipeline/output/<json_stem>/`. It also plots satellite GVF: drop
   `GBOV_<year>/` folders of GVF text files into `input/` and each is overlaid
   with its PhenoCam GCC/NDVI curves in `plotting_pipeline/output/<folder>/`.
-- `anomaly_pipeline/` - **Stage 4: anomaly check.** Notebook builds scores CSVs
-  (from GVF inputs + PhenoCam), gap-by-veg boxplots, and the golden-standard
-  ranking. Artifacts go to `anomaly_pipeline/output/` (`metadata/` for
-  scores CSVs, `boxplot/`, and `golden_standard_ranking.csv`).
+- `anomaly_pipeline/` - **Stage 4: anomaly check.** Notebook scores each input
+  folder (from GVF inputs + PhenoCam) and renders all of its plots into a
+  perfolder subfolder, similar to `plotting_pipeline/output/<folder>/`. Each
+  `anomaly_pipeline/output/<folder>/` holds `scores.csv`, `boxplot.png`,
+  `lag_lollipop.png`, `compression_lollipop.png`, `divergence_bars_by_veg.png`,
+  `divergence_by_site.png`, and `divergence_by_veg.csv`. Cross-folder artifacts
+  go under `anomaly_pipeline/output/_combined/` (`golden_standard_ranking.csv`,
+  `Lag_2023_2024.png`, `Compression_2023_2024.png`).
 - `test/` - loads CSVs from `test/data/ex--/`, runs phase detection and plots via
   `shared.plotting`. Outputs go to `test/output/`.
 
@@ -169,9 +173,12 @@ agreement scores to `plotting_pipeline/output/<folder>/`. That logic lives in
 ### Anomaly check (scores + golden ranking)
 
 Open [`anomaly_pipeline/anomaly_check.ipynb`](anomaly_pipeline/anomaly_check.ipynb)
-to build scores CSVs, gap-by-veg boxplots, and the golden-standard ranking
-(`shared/data_collection.py`). Scores go to `anomaly_pipeline/output/metadata/`;
-ranking and boxplots go to `anomaly_pipeline/output/`.
+and list your input folders in the `FOLDERS` cell. For each folder,
+`build_folder_artifacts` (`shared/data_collection.py`) scores every GVF site-year
+and writes all of that folder's plots into `anomaly_pipeline/output/<folder>/`
+(scores, boxplot, lag/compression lollipops, and divergence). Cross-folder
+summaries (golden ranking + year-vs-year figures) go to
+`anomaly_pipeline/output/_combined/`.
 
 ## Testing:
 
