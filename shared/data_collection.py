@@ -1403,6 +1403,7 @@ def write_lag_box_outliers_by_site(
 	year_flags: dict = {}   # site -> {year: "NDVI:MOS(-75), ..."}
 	year_counts: dict = {}  # site -> {year: n}
 	year_div: dict = {}     # site -> {year: {divcol: val}}
+	year_phases: dict = {}  # site -> {year: {gvf_sos, gcc_mos, ...}}
 	for year in years:
 		clean = scores_by_year[year]
 		detail = find_lag_box_outliers(clean, min_n=min_n, xcap=xcap)
@@ -1410,7 +1411,7 @@ def write_lag_box_outliers_by_site(
 			roi = g["roi"].iloc[0]
 			info = _lookup_site_meta(meta, roi, site)
 			static.setdefault(site, {
-				"site": site, "veg": g["veg"].iloc[0],
+				"site": site, "veg": g["veg"].iloc[0], "roi": roi,
 				"lat": info["lat"], "lon": info["lon"],
 				"water_frac": info["water_frac"], "urban_frac": info["urban_frac"],
 			})
@@ -1427,6 +1428,7 @@ def write_lag_box_outliers_by_site(
 				val = score_row[col] if (score_row is not None and col in score_row.index) else None
 				divs[col] = float(val) if val is not None and pd.notna(val) else None
 			year_div.setdefault(site, {})[year] = divs
+			year_phases.setdefault(site, {})[year] = _phase_columns(clean, site, roi)
 
 	rows = []
 	for site, base in static.items():
@@ -1439,9 +1441,19 @@ def write_lag_box_outliers_by_site(
 		row["flagged_in"] = " ".join(
 			f"{y}:{{{year_flags.get(site, {}).get(y, '')}}}" for y in sorted(years, reverse=True)
 		)
+		if "phenocam_site" not in row:
+			row["phenocam_site"] = _phenocam_sitename(base.get("roi"))
+			row["roi"] = base.get("roi")
 		for y in years:
 			for col in _OUTLIER_DIV_COLS:
 				row[f"{col}_{y}"] = year_div.get(site, {}).get(y, {}).get(col)
+			phases = year_phases.get(site, {}).get(y) or _phase_columns(
+				scores_by_year[y], site, base.get("roi"),
+			)
+			for prefix in _PHASE_SERIES:
+				for p in PHASE_KEYS:
+					col = f"{prefix}_{p.lower()}"
+					row[f"{col}_{y}"] = phases.get(col)
 		rows.append(row)
 
 	out = pd.DataFrame(rows).sort_values(
@@ -1452,6 +1464,39 @@ def write_lag_box_outliers_by_site(
 	out.to_csv(out_csv, index=False)
 	print(f"Wrote {out_csv}  ({len(out)} sites across {', '.join(map(str, years))})")
 	return out_csv
+
+
+_PHASE_SERIES = ("gvf", "gcc", "ndvi")
+
+
+def _phase_columns(clean: pd.DataFrame, site, roi=None) -> dict:
+	"""SOS/MOS/DOS/EOS DOYs for GVF, GCC, and NDVI from a scores row."""
+	score_row = clean.loc[clean["roi"].eq(roi)] if roi is not None else clean.iloc[0:0]
+	if score_row.empty:
+		score_row = clean.loc[clean["site"].eq(site)]
+	score_row = score_row.iloc[0] if len(score_row) else None
+	out = {"roi": roi}
+	if score_row is None:
+		for prefix in _PHASE_SERIES:
+			for p in PHASE_KEYS:
+				out[f"{prefix}_{p.lower()}"] = None
+		return out
+	if out["roi"] is None:
+		out["roi"] = score_row["roi"] if "roi" in score_row.index else None
+	for prefix in _PHASE_SERIES:
+		for p in PHASE_KEYS:
+			col = f"{prefix}_{p.lower()}"
+			val = score_row[col] if col in score_row.index else None
+			out[col] = float(val) if val is not None and pd.notna(val) else None
+	return out
+
+
+def _phenocam_sitename(roi) -> str | None:
+	"""Camera sitename encoded in a roi_name (``site_VEG_seq`` -> ``site``)."""
+	if roi is None or (isinstance(roi, float) and pd.isna(roi)):
+		return None
+	parts = str(roi).rsplit("_", 2)
+	return parts[0] if len(parts) >= 3 else str(roi)
 
 
 _COMP_DIFF_METRICS = (
@@ -1603,6 +1648,7 @@ def write_compression_ref_outliers_by_site(
 	year_flags: dict = {}
 	year_counts: dict = {}
 	year_vals: dict = {}
+	year_phases: dict = {}
 	for year in years:
 		clean = scores_by_year[year]
 		detail = find_compression_ref_outliers(clean, min_n=min_n, abs_cap=abs_cap)
@@ -1610,7 +1656,7 @@ def write_compression_ref_outliers_by_site(
 			roi = g["roi"].iloc[0]
 			info = _lookup_site_meta(meta, roi, site)
 			static.setdefault(site, {
-				"site": site, "veg": g["veg"].iloc[0],
+				"site": site, "veg": g["veg"].iloc[0], "roi": roi,
 				"lat": info["lat"], "lon": info["lon"],
 				"water_frac": info["water_frac"], "urban_frac": info["urban_frac"],
 			})
@@ -1622,6 +1668,7 @@ def write_compression_ref_outliers_by_site(
 				vals[f"{r['metric']}_ndvi"] = r["comp_ndvi"]
 				vals[f"{r['metric']}_d"] = r["delta"]
 			year_vals.setdefault(site, {})[year] = vals
+			year_phases.setdefault(site, {})[year] = _phase_columns(clean, site, roi)
 
 	rows = []
 	for site, base in static.items():
@@ -1633,12 +1680,22 @@ def write_compression_ref_outliers_by_site(
 		row["flagged_in"] = " ".join(
 			f"{y}:{{{year_flags.get(site, {}).get(y, '')}}}" for y in sorted(years, reverse=True)
 		)
+		if "phenocam_site" not in row:
+			row["phenocam_site"] = _phenocam_sitename(base.get("roi"))
+			row["roi"] = base.get("roi")
 		for y in years:
 			vals = year_vals.get(site, {}).get(y, {})
 			for metric, _, _ in _COMP_DIFF_METRICS:
 				row[f"{metric}_gcc_{y}"] = vals.get(f"{metric}_gcc")
 				row[f"{metric}_ndvi_{y}"] = vals.get(f"{metric}_ndvi")
 				row[f"{metric}_d_{y}"] = vals.get(f"{metric}_d")
+			phases = year_phases.get(site, {}).get(y) or _phase_columns(
+				scores_by_year[y], site, base.get("roi"),
+			)
+			for prefix in _PHASE_SERIES:
+				for p in PHASE_KEYS:
+					col = f"{prefix}_{p.lower()}"
+					row[f"{col}_{y}"] = phases.get(col)
 		rows.append(row)
 
 	out = pd.DataFrame(rows).sort_values(
