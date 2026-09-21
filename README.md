@@ -42,10 +42,17 @@ package imports with no extra step --> just run the commands below.
   folder (from GVF inputs + PhenoCam) and renders all of its plots into a
   perfolder subfolder, similar to `plotting_pipeline/output/<folder>/`. Each
   `anomaly_pipeline/output/<folder>/` holds `scores.csv`, `boxplot.png`,
-  `lag_lollipop.png`, `compression_lollipop.png`, `divergence_bars_by_veg.png`,
+  `lag_all_lollipop.png` (GVF vs NDVI & GCC overlaid),
+  `lag_all_lollipop_research.png` (both refs, shared axes),
+  `lag_direction_box.png` (lag distribution box plots vs NDVI & GCC),
+  `compression_all_lollipop.png` (GVF/GCC & GVF/NDVI), `divergence_bars_by_veg.png`,
   `divergence_by_site.png`, and `divergence_by_veg.csv`. Cross-folder artifacts
   go under `anomaly_pipeline/output/_combined/` (`golden_standard_ranking.csv`,
-  `Lag_2023_2024.png`, `Compression_2023_2024.png`).
+  `Lag_2023_2024.png`, `Compression_2023_2024.png`,
+  `Lag_direction_box_2023_2024.png`, `Lag_box_outliers_by_site_2023_2024.csv` — one row
+  per box-plot outlier site with per-year flags, lat/lon, water/urban fraction and divergences,
+  `Compression_ref_outliers_by_site_2023_2024.csv` + `Compression_ref_outliers_2023_2024.png`
+  — sites where GVF/GCC vs GVF/NDVI compression disagree a lot).
 - `test/` - loads CSVs from `test/data/ex--/`, runs phase detection and plots via
   `shared.plotting`. Outputs go to `test/output/`.
 
