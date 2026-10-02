@@ -28,7 +28,7 @@ from shared.phenocam_api import (  # noqa: E402
 )
 
 OUTLIER_CSV = ROOT / "anomaly_pipeline" / "output" / "_combined" / "Lag_box_outliers_by_site_2023_2024.csv"
-OUT_DIR = ROOT / "anomaly_pipeline" / "output" / "_combined" / "phenocam_image_test"
+OUT_DIR = ROOT / "anomaly_pipeline" / "output" / "_combined" / "phenocam_image_outlier"
 DEFAULT_SITE = "harvardfarmnorth"
 
 

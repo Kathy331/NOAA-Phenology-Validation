@@ -1375,6 +1375,42 @@ def find_lag_box_outliers(clean: pd.DataFrame, min_n: int = 5, xcap: float = 90.
 	return pd.DataFrame(rows)
 
 
+def find_lag_box_medians(clean: pd.DataFrame, min_n: int = 5, xcap: float = 90.0) -> pd.DataFrame:
+	"""One closest-to-median site per veg x phase x reference (the box midline).
+
+	Uses the same clipped-lag distribution as :func:`plot_lag_reference_box`.
+	Ties break on site name.
+	"""
+	import numpy as np
+
+	counts = clean.dropna(subset=["veg"]).groupby("veg").size()
+	vegs = [v for v in counts.index if counts[v] >= min_n and str(v).upper() != "XX"]
+	rows = []
+	for ref in ("ndvi", "gcc"):
+		for p in _LAG_PHASE_ORDER:
+			col = _LAG_REFS[ref]["cols"][p]
+			if col not in clean.columns:
+				continue
+			for v in vegs:
+				sub = clean[clean["veg"].eq(v)].copy()
+				s = pd.to_numeric(sub[col], errors="coerce")
+				ok = s.dropna()
+				if len(ok) < min_n:
+					continue
+				clipped = np.clip(ok.to_numpy(float), -xcap, xcap)
+				med = float(np.median(clipped))
+				delta = np.abs(clipped - med)
+				pick = sub.loc[ok.index].assign(_delta=delta, _lag=ok)
+				best = pick.sort_values(["_delta", "site"]).iloc[0]
+				rows.append({
+					"site": best["site"], "roi": best["roi"], "veg": v,
+					"reference": ref.upper(), "phase": p,
+					"lag_days": float(best["_lag"]),
+					"median_days": med,
+				})
+	return pd.DataFrame(rows)
+
+
 def _lookup_site_meta(meta: dict, roi, site) -> dict:
 	if roi in meta:
 		return meta[roi]
@@ -1439,6 +1475,87 @@ def write_lag_box_outliers_by_site(
 			row[f"flags_{y}"] = counts.get(y, 0)
 		# newest year first, always show every year (empty braces when none)
 		row["flagged_in"] = " ".join(
+			f"{y}:{{{year_flags.get(site, {}).get(y, '')}}}" for y in sorted(years, reverse=True)
+		)
+		if "phenocam_site" not in row:
+			row["phenocam_site"] = _phenocam_sitename(base.get("roi"))
+			row["roi"] = base.get("roi")
+		for y in years:
+			for col in _OUTLIER_DIV_COLS:
+				row[f"{col}_{y}"] = year_div.get(site, {}).get(y, {}).get(col)
+			phases = year_phases.get(site, {}).get(y) or _phase_columns(
+				scores_by_year[y], site, base.get("roi"),
+			)
+			for prefix in _PHASE_SERIES:
+				for p in PHASE_KEYS:
+					col = f"{prefix}_{p.lower()}"
+					row[f"{col}_{y}"] = phases.get(col)
+		rows.append(row)
+
+	out = pd.DataFrame(rows).sort_values(
+		["veg", "total_flags", "site"], ascending=[True, False, True]
+	).reset_index(drop=True)
+	out_csv = Path(out_csv)
+	out_csv.parent.mkdir(parents=True, exist_ok=True)
+	out.to_csv(out_csv, index=False)
+	print(f"Wrote {out_csv}  ({len(out)} sites across {', '.join(map(str, years))})")
+	return out_csv
+
+
+def write_lag_box_medians_by_site(
+	scores_by_year: dict, out_csv: str | Path,
+	meta: dict | None = None, min_n: int = 5, xcap: float = 90.0,
+) -> Path:
+	"""Write a cross-year table of closest-to-median sites from ``lag_direction_box``.
+
+	One row per site that is the midline pick in any veg x phase x reference box.
+	``selected_in`` groups picks per year, e.g. ``2024:{NDVI:SOS(lag=-2,med=-2)} 2023:{}``.
+	"""
+	meta = load_site_metadata() if meta is None else meta
+	years = sorted(scores_by_year)
+
+	static: dict = {}
+	year_flags: dict = {}
+	year_counts: dict = {}
+	year_div: dict = {}
+	year_phases: dict = {}
+	for year in years:
+		clean = scores_by_year[year]
+		detail = find_lag_box_medians(clean, min_n=min_n, xcap=xcap)
+		if detail.empty:
+			continue
+		for site, g in detail.groupby("site"):
+			roi = g["roi"].iloc[0]
+			info = _lookup_site_meta(meta, roi, site)
+			static.setdefault(site, {
+				"site": site, "veg": g["veg"].iloc[0], "roi": roi,
+				"lat": info["lat"], "lon": info["lon"],
+				"water_frac": info["water_frac"], "urban_frac": info["urban_frac"],
+			})
+			year_flags.setdefault(site, {})[year] = ", ".join(
+				f"{r['reference']}:{r['phase']}(lag={r['lag_days']:+.0f},med={r['median_days']:+.0f})"
+				for _, r in g.iterrows()
+			)
+			year_counts.setdefault(site, {})[year] = len(g)
+			score_row = clean.loc[clean["roi"].eq(roi)]
+			if score_row.empty:
+				score_row = clean.loc[clean["site"].eq(site)]
+			score_row = score_row.iloc[0] if len(score_row) else None
+			divs = {}
+			for col in _OUTLIER_DIV_COLS:
+				val = score_row[col] if (score_row is not None and col in score_row.index) else None
+				divs[col] = float(val) if val is not None and pd.notna(val) else None
+			year_div.setdefault(site, {})[year] = divs
+			year_phases.setdefault(site, {})[year] = _phase_columns(clean, site, roi)
+
+	rows = []
+	for site, base in static.items():
+		row = dict(base)
+		counts = year_counts.get(site, {})
+		row["total_flags"] = sum(counts.values())
+		for y in years:
+			row[f"flags_{y}"] = counts.get(y, 0)
+		row["selected_in"] = " ".join(
 			f"{y}:{{{year_flags.get(site, {}).get(y, '')}}}" for y in sorted(years, reverse=True)
 		)
 		if "phenocam_site" not in row:
