@@ -7,6 +7,11 @@ Phenophase DOYs already live in ``scores.csv``. Writes:
 
 Also moves the legacy ``phenocam_image_test/{site}/{year}/`` tree into the
 outlier layout. Copies a JPEG already on disk when ``(site, date)`` matches.
+Every outlier site-year folder gets an ``outlier_phases.txt`` saying which
+phase(s) and which series (GVF / GCC / NDVI) were flagged. Outlier images are
+fetched per flagged ROI, so multi-ROI sites get each ROI's own phase dates.
+Dates with no photo on PhenoCam (within 2 days) are logged to
+``phenocam_missing_images.csv`` and not retried.
 
 Run:
     python anomaly_pipeline/fetch_outlier_phase_images.py --set good
@@ -29,7 +34,10 @@ sys.path.insert(0, str(ROOT))
 from shared.data_collection import (  # noqa: E402
     PHASE_KEYS,
     enrich_scores_frame,
+    find_compression_ref_outliers,
+    find_lag_box_outliers,
     load_table,
+    _phenocam_sitename,
     write_compression_ref_outliers_by_site,
     write_lag_box_medians_by_site,
     write_lag_box_outliers_by_site,
@@ -43,6 +51,7 @@ SERIES = ("gcc", "ndvi", "gvf")
 OUTLIER_DIR = COMBINED / "phenocam_image_outlier"
 GOOD_DIR = COMBINED / "phenocam_image_good"
 LEGACY_DIR = COMBINED / "phenocam_image_test"
+MISSING_CSV = COMBINED / "phenocam_missing_images.csv"
 
 
 def _year_of(folder: str) -> int:
@@ -154,6 +163,45 @@ def _merge_site_rows(frames: list[tuple[str, pd.DataFrame]], year_list: list[int
     return list(by_site.values())
 
 
+def _outlier_roi_jobs(scores_by_year: dict, site_vegs: dict[str, str]) -> list[dict]:
+    """One download job per flagged (site, ROI), carrying that ROI's own phase DOYs."""
+    jobs: dict[tuple[str, str], dict] = {}
+    for year, clean in sorted(scores_by_year.items()):
+        lag = find_lag_box_outliers(clean)
+        comp = find_compression_ref_outliers(clean)
+        pairs = {
+            (r["site"], r["roi"]): src
+            for src, frame in (("lag", lag), ("compression", comp)) if len(frame)
+            for r in frame[["site", "roi"]].drop_duplicates().to_dict("records")
+        }
+        for (site, roi), src in sorted(pairs.items()):
+            row = _score_row(clean, site, roi)
+            job = jobs.setdefault((site, roi), {
+                "site": site,
+                "roi": roi,
+                "veg": site_vegs.get(site) or "XX",
+                "phenocam_site": _phenocam_sitename(roi),
+                "sources": set(),
+            })
+            job["sources"].add(src)
+            job[f"flags_{year}"] = 1
+            for series in SERIES:
+                for phase in PHASE_KEYS:
+                    job[f"{series}_{phase.lower()}_{year}"] = _doy(row, f"{series}_{phase.lower()}")
+    return list(jobs.values())
+
+
+def _load_missing() -> set[tuple[str, str]]:
+    if not MISSING_CSV.exists():
+        return set()
+    df = pd.read_csv(MISSING_CSV, dtype=str)
+    return set(zip(df["phenocam_site"], df["date"]))
+
+
+def _save_missing(missing: set[tuple[str, str]]) -> None:
+    pd.DataFrame(sorted(missing), columns=["phenocam_site", "date"]).to_csv(MISSING_CSV, index=False)
+
+
 def _empty(val) -> bool:
     if val is None or val == "":
         return True
@@ -190,6 +238,7 @@ def _download_set(
     year_list: list[int],
     *,
     jpeg_cache: dict[tuple[str, str], Path],
+    missing: set[tuple[str, str]],
     limit: int = 0,
 ) -> tuple[int, int, int, list[dict]]:
     if limit:
@@ -229,6 +278,9 @@ def _download_set(
                         n_ok += 1
                         print(f"    {series} {phase} DOY {doy:.0f} {iso}  copy {cached.name}")
                         continue
+                    if (cam, iso) in missing:
+                        n_miss += 1
+                        continue
                     try:
                         got = fetch_one_midday_image(cam, out, date=iso)
                         jpeg_cache[(cam, iso)] = out
@@ -243,6 +295,8 @@ def _download_set(
                         print(f"    {series} {phase} DOY {doy:.0f} {iso}  {got['bytes']} B")
                     except Exception as exc:
                         n_miss += 1
+                        if "No RGB midday JPEG" in str(exc):
+                            missing.add((cam, iso))
                         manifest_rows.append({
                             "site": site, "veg": veg, "phenocam_site": cam, "year": year,
                             "series": series, "phase": phase, "doy": doy,
@@ -251,6 +305,158 @@ def _download_set(
                         })
                         print(f"    {series} {phase} DOY {doy} {iso}  FAIL {exc}")
     return n_ok, n_miss, n_skip, manifest_rows
+
+
+NOTE_NAME = "outlier_phases.txt"
+_COMP_PHASES = {"greenup": ("SOS", "MOS"), "senescence": ("DOS", "EOS")}
+
+
+def _outlier_site_vegs(comp_table: pd.DataFrame, lag_table: pd.DataFrame, year_list) -> dict[str, str]:
+    """Veg folder per outlier site, matching where ``_download_set`` puts the images."""
+    return {
+        r["site"]: str(r.get("veg") or "XX").upper()
+        for r in _merge_site_rows((("compression", comp_table), ("lag", lag_table)), year_list)
+    }
+
+
+def _score_row(clean: pd.DataFrame, site, roi):
+    row = clean.loc[clean["roi"].eq(roi)]
+    if row.empty:
+        row = clean.loc[clean["site"].eq(site)]
+    return row.iloc[0] if len(row) else None
+
+
+def _doy(row, col):
+    if row is None or col not in row.index or pd.isna(row[col]):
+        return None
+    return int(round(float(row[col])))
+
+
+def _image_name(folder: Path, series: str, phase: str, year: int, doy, cam: str, missing) -> str:
+    iso = _doy_to_date(year, doy)
+    if iso is None:
+        return f"{series}_{phase}: (no date)"
+    name = f"{series}_{phase}_{iso}.jpg"
+    if (folder / name).exists():
+        return name
+    if (cam, iso) in missing:
+        return f"{name} (no image: camera had no photo within 2 days)"
+    return f"{name} (not downloaded yet: rerun without --skip-download)"
+
+
+def _odd_span(span: dict[str, int | None]) -> str:
+    vals = {k: v for k, v in span.items() if v is not None}
+    if len(vals) < 3:
+        return "unknown (missing a phase date)"
+    mid = sorted(vals.values())[1]
+    return max(vals, key=lambda k: abs(vals[k] - mid)).upper()
+
+
+def _lag_suspect(flags_at_phase: set[str]) -> str:
+    if {"NDVI", "GCC"} <= flags_at_phase:
+        return "GVF (disagrees with both NDVI and GCC at this phase)"
+    ref = next(iter(flags_at_phase))
+    other = "GCC" if ref == "NDVI" else "NDVI"
+    return f"{ref} (GVF still agrees with {other} at this phase)"
+
+
+def write_outlier_notes(scores_by_year: dict, site_vegs: dict[str, str]) -> int:
+    """Write ``{VEG}/{site}/{year}/outlier_phases.txt`` for every flagged site-year.
+
+    Recomputed from scores on each run (same fences as the CSVs), so stale notes
+    are removed first and new outliers always get one.
+    """
+    for old in OUTLIER_DIR.rglob(NOTE_NAME):
+        old.unlink()
+
+    missing = _load_missing()
+    written = 0
+    for year in sorted(scores_by_year):
+        clean = scores_by_year[year]
+        lag = find_lag_box_outliers(clean)
+        comp = find_compression_ref_outliers(clean)
+        sites = sorted(set(lag.get("site", [])) | set(comp.get("site", [])))
+        for site in sites:
+            veg = site_vegs.get(site) or "XX"
+            folder = OUTLIER_DIR / veg / site / str(year)
+            folder.mkdir(parents=True, exist_ok=True)
+            lag_s = lag[lag["site"].eq(site)] if len(lag) else lag
+            comp_s = comp[comp["site"].eq(site)] if len(comp) else comp
+            rois = sorted(set(lag_s.get("roi", [])) | set(comp_s.get("roi", [])))
+
+            lines = [f"{site} ({veg}) {year} - why this site-year is an outlier", ""]
+            for roi in rois:
+                row = _score_row(clean, site, roi)
+                cam = _phenocam_sitename(roi)
+                lines.append(f"ROI: {roi}   (camera: {cam})")
+                lines.append("")
+
+                def imgs(ph):
+                    return " | ".join(
+                        _image_name(folder, s, ph, year, _doy(row, f"{s}_{ph.lower()}"), cam, missing)
+                        for s in ("gvf", "gcc", "ndvi")
+                    )
+
+                lr = lag_s[lag_s["roi"].eq(roi)].drop_duplicates(["reference", "phase"]) if len(lag_s) else lag_s
+                lines.append("LAG OUTLIERS (dot on the lag box plot; lag = GVF date - PhenoCam date)")
+                if len(lr):
+                    by_phase: dict[str, set[str]] = {}
+                    for r in lr.itertuples():
+                        by_phase.setdefault(r.phase, set()).add(r.reference)
+                    for r in lr.sort_values(["phase", "reference"]).itertuples():
+                        ref = r.reference.lower()
+                        g, x = _doy(row, f"gvf_{r.phase.lower()}"), _doy(row, f"{ref}_{r.phase.lower()}")
+                        lines.append(
+                            f"  {r.phase} vs {r.reference}: lag {r.lag_days:+.0f} d "
+                            f"(GVF DOY {g}, {r.reference} DOY {x}; normal range {r.fence_lo:+.0f} to {r.fence_hi:+.0f} d)"
+                        )
+                    for phase, refs in sorted(by_phase.items()):
+                        lines.append(f"  -> {phase} likely odd series: {_lag_suspect(refs)}")
+                        lines.append(f"     compare: {imgs(phase)}")
+                else:
+                    lines.append("  none")
+                lines.append("")
+
+                cr = comp_s[comp_s["roi"].eq(roi)].drop_duplicates("metric") if len(comp_s) else comp_s
+                lines.append("COMPRESSION OUTLIERS (GVF season length / PhenoCam season length)")
+                if len(cr):
+                    for r in cr.itertuples():
+                        p0, p1 = _COMP_PHASES[r.metric]
+                        span = {
+                            s: (None if _doy(row, f"{s}_{p0.lower()}") is None or _doy(row, f"{s}_{p1.lower()}") is None
+                                else _doy(row, f"{s}_{p1.lower()}") - _doy(row, f"{s}_{p0.lower()}"))
+                            for s in ("gvf", "gcc", "ndvi")
+                        }
+                        odd = _odd_span(span)
+                        lines.append(
+                            f"  {r.metric} ({p0}->{p1}): vs GCC {r.comp_gcc:.2f}x, vs NDVI {r.comp_ndvi:.2f}x, "
+                            f"d = {r.delta:+.2f} (normal range {r.fence_lo:+.2f} to {r.fence_hi:+.2f}, or |d| >= 5)"
+                        )
+                        lines.append(
+                            f"    {p0}->{p1} length: GVF {span['gvf']} d, GCC {span['gcc']} d, NDVI {span['ndvi']} d"
+                        )
+                        lines.append(f"  -> likely odd series: {odd} (its {p0}->{p1} span is farthest from the other two)")
+                        for ph in (p0, p1):
+                            lines.append(f"     {ph}: {imgs(ph)}")
+                else:
+                    lines.append("  none")
+                lines.append("")
+
+                lines.append("PHASE DOYs        GVF   GCC  NDVI")
+                for ph in PHASE_KEYS:
+                    vals = [_doy(row, f"{s}_{ph.lower()}") for s in ("gvf", "gcc", "ndvi")]
+                    lines.append(f"  {ph:<14}" + "".join(f"{'-' if v is None else v:>6}" for v in vals))
+                lines.append("")
+
+            lines.append(
+                "'Likely odd series' is a hint, not a verdict. Lag: flagged against both NDVI and GCC points at GVF; "
+                "flagged against one points at that reference. Compression: the series whose season span is "
+                "farthest from the other two. Check the images."
+            )
+            (folder / NOTE_NAME).write_text("\n".join(lines) + "\n")
+            written += 1
+    print(f"notes  wrote {written} {NOTE_NAME} files under {OUTLIER_DIR}")
+    return written
 
 
 def main() -> int:
@@ -285,21 +491,25 @@ def main() -> int:
     year_list = sorted(scores_by_year)
     veg_map = _veg_map(lag_table, median_table, comp_table, scores_by_year=scores_by_year)
     reorg_legacy_images(veg_map)
+    site_vegs = _outlier_site_vegs(comp_table, lag_table, year_list)
 
     if args.skip_download:
+        write_outlier_notes(scores_by_year, site_vegs)
         print("skip-download: CSVs updated; image folders reorganized")
         return 0
 
     jpeg_cache: dict[tuple[str, str], Path] = {}
     _seed_cache([OUTLIER_DIR, GOOD_DIR], jpeg_cache)
+    missing = _load_missing()
     all_rows: list[dict] = []
     n_ok = n_miss = n_skip = 0
     if args.which in ("outlier", "both"):
-        sites = _merge_site_rows((("compression", comp_table), ("lag", lag_table)), year_list)
-        print(f"outlier sites={len(sites)} -> {OUTLIER_DIR}")
+        jobs = _outlier_roi_jobs(scores_by_year, site_vegs)
+        print(f"outlier site-ROIs={len(jobs)} -> {OUTLIER_DIR}")
         ok, miss, skip, rows = _download_set(
-            sites, OUTLIER_DIR, year_list, jpeg_cache=jpeg_cache, limit=args.limit,
+            jobs, OUTLIER_DIR, year_list, jpeg_cache=jpeg_cache, missing=missing, limit=args.limit,
         )
+        _save_missing(missing)
         n_ok += ok
         n_miss += miss
         n_skip += skip
@@ -308,13 +518,15 @@ def main() -> int:
         sites = _merge_site_rows((("median", median_table),), year_list)
         print(f"median sites={len(sites)} -> {GOOD_DIR}")
         ok, miss, skip, rows = _download_set(
-            sites, GOOD_DIR, year_list, jpeg_cache=jpeg_cache, limit=args.limit,
+            sites, GOOD_DIR, year_list, jpeg_cache=jpeg_cache, missing=missing, limit=args.limit,
         )
+        _save_missing(missing)
         n_ok += ok
         n_miss += miss
         n_skip += skip
         all_rows.extend(rows)
 
+    write_outlier_notes(scores_by_year, site_vegs)
     man = COMBINED / "phenocam_phase_images_manifest.csv"
     pd.DataFrame(all_rows).to_csv(man, index=False)
     print(f"done  ok={n_ok} miss={n_miss} skip_no_doy={n_skip}  manifest={man}")

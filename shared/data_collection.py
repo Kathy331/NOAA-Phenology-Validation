@@ -1274,7 +1274,9 @@ def plot_lag_reference_box_years(
 	fig, axes = plt.subplots(
 		len(years), len(phases),
 		figsize=(4.7 * len(phases), (0.55 * len(vegs) + 1.6) * len(years)),
-		sharey=True, squeeze=False,
+		# share y within a year row only: a figure-wide share makes the last
+		# row's tick labels (n per biome) overwrite every other year's labels
+		sharey="row", squeeze=False,
 	)
 	y = np.arange(len(vegs))
 	for r, yr in enumerate(years):
@@ -1288,8 +1290,8 @@ def plot_lag_reference_box_years(
 		axes[r][0].set_ylabel(str(yr), fontsize=12, fontweight="bold")
 		axes[r][0].set_yticks(y)
 		axes[r][0].set_yticklabels([f"{v} (n={int(counts[yr].get(v, 0))})" for v in vegs], fontsize=8)
-	axes[0][0].set_ylim(-0.6, len(vegs) - 0.4)
-	axes[0][0].invert_yaxis()
+		axes[r][0].set_ylim(-0.6, len(vegs) - 0.4)
+		axes[r][0].invert_yaxis()
 
 	fig.suptitle("Phase lag distribution: GVF-NDVI vs GVF-GCC - 2023 vs 2024", fontsize=13, fontweight="bold")
 	_dumbbell_legend(fig, refs)
