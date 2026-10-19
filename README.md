@@ -44,12 +44,14 @@ package imports with no extra step --> just run the commands below.
   `anomaly_pipeline/output/<folder>/` holds `scores.csv`, `boxplot.png`,
   `lag_all_lollipop.png` (GVF vs NDVI & GCC overlaid),
   `lag_all_lollipop_research.png` (both refs, shared axes),
-  `lag_direction_box.png` (lag distribution box plots vs NDVI & GCC),
+  `lag_direction_box.png` (lag distribution box plots vs NDVI & GCC) +
+  `lag_direction_box_stats.csv` (its significance tests, see below),
   `compression_all_lollipop.png` (GVF/GCC & GVF/NDVI), `divergence_bars_by_veg.png`,
   `divergence_by_site.png`, and `divergence_by_veg.csv`. Cross-folder artifacts
   go under `anomaly_pipeline/output/_combined/` (`golden_standard_ranking.csv`,
   `Lag_2023_2024.png`, `Compression_2023_2024.png`,
-  `Lag_direction_box_2023_2024.png`, `Lag_box_outliers_by_site_2023_2024.csv` — one row
+  `Lag_direction_box_2023_2024.png` + `Lag_direction_box_2023_2024_stats.csv`,
+  `Lag_box_outliers_by_site_2023_2024.csv` — one row
   per box-plot outlier site with per-year flags, lat/lon, water/urban fraction and divergences,
   `Compression_ref_outliers_by_site_2023_2024.csv` + `Compression_ref_outliers_2023_2024.png`
   — sites where GVF/GCC vs GVF/NDVI compression disagree a lot).
@@ -186,6 +188,60 @@ and writes all of that folder's plots into `anomaly_pipeline/output/<folder>/`
 (scores, boxplot, lag/compression lollipops, and divergence). Cross-folder
 summaries (golden ranking + year-vs-year figures) go to
 `anomaly_pipeline/output/_combined/`.
+
+### Reading the lag box plots and their statistics
+
+**What the plot shows.** `lag_direction_box.png` and
+`Lag_direction_box_2023_2024.png` answer one question: *does the satellite
+(GVF) say a season stage happens earlier or later than the ground camera
+(PhenoCam) does?*
+
+- Each box is one group of sites: one biome (DB, GR, ...), one stage (SOS, MOS,
+  DOS, EOS), one year, compared against one camera signal.
+- **Blue** = compared with camera NDVI. **Orange** = compared with camera GCC.
+- **Left of the 0 line:** the satellite is *earlier* than the camera.
+  **Right:** the satellite is *later*. On the line: they agree.
+- The black line in the box is the typical (middle) site. Dots are unusual
+  sites. `n` is how many sites are in that biome.
+
+**The label next to each box** (grey strip on the right) answers: *is this
+shift real, or could it just be luck?*
+
+- A box can sit off 0 by chance, especially with few sites. So each box is
+  tested against the idea "there is no shift".
+- `*`, `**`, `***` = **real shift.** The sites consistently lean the same way.
+  More stars = more certain.
+- `ns` = **not proven.** Either there is no shift, or there are too few sites
+  to tell. Small groups (about 5–8 sites, like WL and UN) almost never get a
+  star, so `ns` there mostly means "not enough data".
+- `q` is the number behind the stars (smaller = more certain; below 0.05 gets a
+  star). It is already corrected for the fact that many boxes are tested at
+  once, so a few "lucky" boxes don't show up as stars.
+
+**How much to trust a shift:**
+
+1. **Strong:** starred in both years, pointing the same way. This is a real,
+   repeatable difference between the satellite and the camera.
+2. **Maybe:** starred in only one year. Check if the other year leans the
+   same way.
+3. **Suspicious:** starred in both years but pointing opposite ways (e.g. 111
+   days early one year, 50 days late the next). Usually a date was picked from
+   the wrong season. Look at those sites' images.
+4. **Unknown:** `ns`.
+
+**More detail** is in the `*_stats.csv` saved next to each PNG (one row per
+box). Useful columns: `median` (typical shift in days, with `ci_lo`/`ci_hi` as
+its likely range), `n_earlier`/`n_later` (how many sites lean each way), and
+`q_bh`/`signif` (what the plot shows). The other columns (`p`, `r_rb`,
+`p_sign`, `mean`) are extra checks for anyone who wants the full statistics.
+
+*For statisticians:* each box uses a two-sided Wilcoxon signed-rank test of
+median lag = 0 on the unclipped per-site lags (zero lags dropped). The p-values
+are Benjamini-Hochberg adjusted across all boxes in the figure. Sites are
+assumed independent, which is not strictly true for several ROIs at one site.
+The code is `lag_shift_test` in `shared/data_collection.py`, called by both box
+plot functions, so every regenerated plot gets the labels and CSV
+automatically.
 
 ## Testing:
 

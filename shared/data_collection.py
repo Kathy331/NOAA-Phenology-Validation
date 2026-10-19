@@ -1149,17 +1149,118 @@ def _dumbbell_legend(fig, refs):
 		bbox_to_anchor=(0.5, -0.005), frameon=True, fontsize=9)
 
 
+def lag_shift_test(values, n_boot: int = 2000, seed: int = 0) -> dict:
+	"""Test H0 "no shift" (median lag = 0) for one box of per-site lags.
+
+	Wilcoxon signed-rank (two-sided, exact for small n; zero lags dropped) gives
+	``p``; ``r_rb`` is the matched-pairs rank-biserial effect size (-1 = all
+	earlier, +1 = all later); ``p_sign`` is the sign test; ``ci_lo``/``ci_hi`` is
+	a bootstrap 95% CI of the median.
+	"""
+	import numpy as np
+	from scipy import stats
+
+	arr = np.asarray(values, dtype=float)
+	arr = arr[np.isfinite(arr)]
+	nz = arr[arr != 0]
+	n_later, n_earlier = int((arr > 0).sum()), int((arr < 0).sum())
+	out = {
+		"n": len(arr), "median": float(np.median(arr)) if len(arr) else np.nan,
+		"mean": float(arr.mean()) if len(arr) else np.nan,
+		"n_later": n_later, "n_earlier": n_earlier,
+		"p": np.nan, "r_rb": np.nan, "p_sign": np.nan, "ci_lo": np.nan, "ci_hi": np.nan,
+	}
+	if len(nz) >= 3:
+		out["p"] = float(stats.wilcoxon(nz).pvalue)
+		ranks = stats.rankdata(np.abs(nz))
+		out["r_rb"] = float((ranks[nz > 0].sum() - ranks[nz < 0].sum()) / ranks.sum())
+		out["p_sign"] = float(stats.binomtest(n_later, n_later + n_earlier).pvalue)
+	if len(arr) >= 3:
+		rng = np.random.default_rng(seed)
+		meds = np.median(rng.choice(arr, size=(n_boot, len(arr)), replace=True), axis=1)
+		out["ci_lo"], out["ci_hi"] = (float(x) for x in np.percentile(meds, [2.5, 97.5]))
+	return out
+
+
+def _bh_adjust(pvals) -> list:
+	"""Benjamini-Hochberg q-values; NaN p-values stay NaN."""
+	import numpy as np
+	from scipy import stats
+
+	p = np.asarray(pvals, dtype=float)
+	q = np.full_like(p, np.nan)
+	ok = np.isfinite(p)
+	if ok.any():
+		q[ok] = stats.false_discovery_control(p[ok], method="bh")
+	return q.tolist()
+
+
+def _stars(q) -> str:
+	if q is None or not q == q:
+		return "n/a"
+	return "***" if q < 0.001 else "**" if q < 0.01 else "*" if q < 0.05 else "ns"
+
+
+def _fmt_q(q) -> str:
+	if not q == q:
+		return "too few"
+	return f"q<.001 {_stars(q)}" if q < 0.001 else f"q={q:.3g}".replace("0.", ".", 1) + f" {_stars(q)}"
+
+
+def _lag_ref_offsets(n_ref: int):
+	import numpy as np
+
+	return np.linspace(0.2, -0.2, n_ref) if n_ref > 1 else [0.0]
+
+
+_LAG_STAT_ROOM = 58  # extra x-range (days) right of the boxes for the p/q labels
+_LAG_STATS_NOTE = (
+	"Label beside each box: is the shift real or just luck? * / ** / *** = real shift (more stars = more sure); "
+	"ns = not proven (no shift, or too few sites). q < .05 gets a star, already corrected for testing many boxes "
+	"(Wilcoxon signed-rank vs 0, Benjamini-Hochberg). Details in the *_stats.csv next to this PNG."
+)
+
+
+def _annotate_lag_stats(rows: list[dict], xcap: float) -> None:
+	"""BH-adjust every box test in the figure, then print q + stars beside each box."""
+	qs = _bh_adjust([r["p"] for r in rows])
+	for r, q in zip(rows, qs):
+		r["q_bh"] = q
+		r["signif"] = _stars(q)
+		color = _REF_DOT_COLORS.get(r["ref"], "#555")
+		r["ax"].text(
+			xcap + 12, r["ypos"], _fmt_q(q), va="center", ha="left", fontsize=6.3,
+			color=color, fontweight="bold" if q == q and q < 0.05 else "normal", zorder=4,
+		)
+
+
+def _write_lag_stats(rows: list[dict], out_png: Path) -> Path:
+	cols = [
+		"year", "veg", "reference", "phase", "n", "median", "ci_lo", "ci_hi", "mean",
+		"n_earlier", "n_later", "p", "q_bh", "signif", "r_rb", "p_sign",
+	]
+	table = pd.DataFrame([{**r, "reference": r["ref"].upper()} for r in rows]).reindex(columns=cols)
+	out_csv = out_png.with_name(f"{out_png.stem}_stats.csv")
+	table.round({"median": 1, "ci_lo": 1, "ci_hi": 1, "mean": 1, "r_rb": 3}).to_csv(out_csv, index=False)
+	print(f"Wrote {out_csv}")
+	return out_csv
+
+
 def _draw_lag_boxes(ax, vegs, year_df, refs, xcap, phase):
 	"""One phase panel: box plot of per-site lag per biome for each reference.
 
 	Each biome gets one box per reference (GVF-NDVI, GVF-GCC), offset vertically.
 	Box = IQR, line = median, whiskers = 1.5x IQR, dots = outlier sites; colour =
 	reference; left of 0 = GVF earlier, right = GVF later.
+
+	Returns one :func:`lag_shift_test` row per box (unclipped lags), tagged with
+	the axis and y position so the caller can label it after BH adjustment.
 	"""
 	import numpy as np
 
+	stats_rows: list[dict] = []
 	n_ref = max(len(refs), 1)
-	offsets = np.linspace(0.2, -0.2, n_ref) if n_ref > 1 else [0.0]
+	offsets = _lag_ref_offsets(n_ref)
 	width = 0.66 / n_ref if n_ref > 1 else 0.5
 	for k, r in enumerate(refs):
 		col = _LAG_REFS[r]["cols"][phase]
@@ -1174,6 +1275,10 @@ def _draw_lag_boxes(ax, vegs, year_df, refs, xcap, phase):
 				continue
 			data.append(np.clip(s.to_numpy(dtype=float), -xcap, xcap))
 			pos.append(i + offsets[k])
+			stats_rows.append({
+				"veg": v, "ref": r, "phase": phase, "ax": ax, "ypos": i + offsets[k],
+				**lag_shift_test(s.to_numpy(dtype=float)),
+			})
 		if not data:
 			continue
 		bp = ax.boxplot(
@@ -1189,8 +1294,11 @@ def _draw_lag_boxes(ax, vegs, year_df, refs, xcap, phase):
 			patch.set_facecolor(color)
 			patch.set_alpha(0.75)
 	ax.axvline(0, color="black", lw=0.9, zorder=2)
-	ax.set_xlim(-(xcap + 8), xcap + 8)
+	ax.set_xlim(-(xcap + 8), xcap + _LAG_STAT_ROOM)
+	ax.set_xticks([t for t in range(-75, int(xcap) + 1, 25)])
+	ax.axvspan(xcap + 8, xcap + _LAG_STAT_ROOM, color="#f4f4f4", zorder=0)
 	ax.grid(True, axis="x", alpha=0.25)
+	return stats_rows
 
 
 def plot_lag_reference_box(
@@ -1216,11 +1324,12 @@ def plot_lag_reference_box(
 	phases = _LAG_PHASE_ORDER
 
 	fig, axes = plt.subplots(
-		1, len(phases), figsize=(4.7 * len(phases), 0.62 * len(vegs) + 2.2), sharey=True,
+		1, len(phases), figsize=(5.6 * len(phases), 0.62 * len(vegs) + 2.2), sharey=True,
 	)
 	y = np.arange(len(vegs))
+	stat_rows: list[dict] = []
 	for ax, p in zip(axes, phases):
-		_draw_lag_boxes(ax, vegs, df, refs, xcap, p)
+		stat_rows += _draw_lag_boxes(ax, vegs, df, refs, xcap, p)
 		ax.set_title(p, fontsize=12, fontweight="bold")
 		ax.set_xlabel("lag (days)", fontsize=8)
 	axes[0].set_yticks(y)
@@ -1234,14 +1343,16 @@ def plot_lag_reference_box(
 		0.5, 0.03,
 		"Box = IQR of per-site lag, line = median, whiskers = 1.5x IQR, dots = outlier sites. "
 		f"Left of 0 = GVF earlier, right = GVF later (clipped +/-{int(xcap)} d). "
-		"NDVI = blue, GCC = orange; n per biome on the axis. Spin-up excluded.",
+		"NDVI = blue, GCC = orange; n per biome on the axis. Spin-up excluded.\n" + _LAG_STATS_NOTE,
 		ha="center", fontsize=8, style="italic",
 	)
-	fig.tight_layout(rect=[0, 0.06, 1, 0.96])
+	_annotate_lag_stats(stat_rows, xcap)
+	fig.tight_layout(rect=[0, 0.07, 1, 0.96])
 	out_png.parent.mkdir(parents=True, exist_ok=True)
 	fig.savefig(out_png, dpi=160, bbox_inches="tight")
 	plt.close(fig)
 	print(f"Wrote {out_png}")
+	_write_lag_stats([{**r, "year": title_prefix} for r in stat_rows], out_png)
 	return out_png
 
 
@@ -1273,16 +1384,18 @@ def plot_lag_reference_box_years(
 
 	fig, axes = plt.subplots(
 		len(years), len(phases),
-		figsize=(4.7 * len(phases), (0.55 * len(vegs) + 1.6) * len(years)),
+		figsize=(5.6 * len(phases), (0.55 * len(vegs) + 1.6) * len(years)),
 		# share y within a year row only: a figure-wide share makes the last
 		# row's tick labels (n per biome) overwrite every other year's labels
 		sharey="row", squeeze=False,
 	)
 	y = np.arange(len(vegs))
+	stat_rows: list[dict] = []
 	for r, yr in enumerate(years):
 		for c, p in enumerate(phases):
 			ax = axes[r][c]
-			_draw_lag_boxes(ax, vegs, scores_by_year[yr], refs, xcap, p)
+			rows = _draw_lag_boxes(ax, vegs, scores_by_year[yr], refs, xcap, p)
+			stat_rows += [{**row, "year": yr} for row in rows]
 			if r == 0:
 				ax.set_title(p, fontsize=12, fontweight="bold")
 			if r == len(years) - 1:
@@ -1298,14 +1411,17 @@ def plot_lag_reference_box_years(
 	fig.text(
 		0.5, 0.02,
 		"Box = IQR of per-site lag, line = median, whiskers = 1.5x IQR, dots = outlier sites. "
-		f"Left = GVF earlier, right = GVF later (clipped +/-{int(xcap)} d). NDVI = blue, GCC = orange; n per biome on the axis.",
+		f"Left = GVF earlier, right = GVF later (clipped +/-{int(xcap)} d). NDVI = blue, GCC = orange; n per biome on the axis.\n"
+		+ _LAG_STATS_NOTE,
 		ha="center", fontsize=8.5, style="italic",
 	)
-	fig.tight_layout(rect=[0, 0.04, 1, 0.965])
+	_annotate_lag_stats(stat_rows, xcap)
+	fig.tight_layout(rect=[0, 0.05, 1, 0.965])
 	out_png.parent.mkdir(parents=True, exist_ok=True)
 	fig.savefig(out_png, dpi=160, bbox_inches="tight")
 	plt.close(fig)
 	print(f"Wrote {out_png}")
+	_write_lag_stats(stat_rows, out_png)
 	return out_png
 
 

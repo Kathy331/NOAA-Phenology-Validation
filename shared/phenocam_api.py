@@ -21,6 +21,7 @@ import pandas as pd
 API_BASE = "https://phenocam.nau.edu/api"
 ARCHIVE_BASE = "https://phenocam.nau.edu/data/archive"
 ROILIST_PAGE_SIZE = 2000 # maximum number of records to fetch at once
+DAYTIME_HOURS = (9, 15) # local-time hours accepted for "midday" stills
 
 NUMERIC_COLUMNS = ("doy", "year", "gcc_90", "ndvi_90")
 REQUIRED_COLUMNS = ("date", *NUMERIC_COLUMNS)
@@ -186,6 +187,9 @@ def browse_rgb_urls(site: str, date: str, timeout: float = 20.0) -> list[str]:
 	if not times:
 		clocks = re.findall(r"(\d{2}):(\d{2}):(\d{2})\s+UTC", html)
 		times = [f"{h}{mi}{s}" for h, mi, s in clocks]
+	# Archive filenames use the camera's local time; outside this window the
+	# photo is a night/IR-dark frame (some cameras only log one ~00:01 shot a day).
+	times = [t for t in times if DAYTIME_HOURS[0] <= int(t[0:2]) < DAYTIME_HOURS[1]]
 	if not times:
 		return []
 
@@ -253,6 +257,15 @@ def _download_jpeg(url: str, timeout: float) -> bytes:
 	return data
 
 
+def _too_dark(data: bytes, threshold: float = 35.0) -> bool:
+	"""True for near-black frames (night shots, blocked/failed exposures)."""
+	from PIL import Image, ImageStat
+
+	img = Image.open(io.BytesIO(data)).convert("L")
+	img.thumbnail((200, 200))
+	return ImageStat.Stat(img).mean[0] < threshold
+
+
 def fetch_one_midday_image(
 	site: str,
 	out_path,
@@ -276,6 +289,8 @@ def fetch_one_midday_image(
 		for url in _dated_archive_candidates(site, date, timeout=min(timeout, 20.0)):
 			try:
 				data = _download_jpeg(url, timeout)
+				if _too_dark(data):
+					continue
 				picked = {
 					"imgdate": date,
 					"site": site,
@@ -299,3 +314,43 @@ def fetch_one_midday_image(
 	out_path.parent.mkdir(parents=True, exist_ok=True)
 	out_path.write_bytes(data)
 	return {**picked, "url": url, "bytes": len(data), "out_path": str(out_path)}
+
+
+def roi_mask_list(camera: str, roi_name: str, timeout: float = 30.0) -> list[dict]:
+	"""Mask versions for one ROI from ``{roi_name}_roi.csv`` (empty list if none).
+
+	Each dict has ``start``, ``end`` (ISO dates; ``9999-12-31`` = still active)
+	and ``maskfile``. Mask pixels are 0 inside the ROI and 255 outside.
+	"""
+	import urllib.error
+
+	url = f"{ARCHIVE_BASE}/{camera}/ROI/{roi_name}_roi.csv"
+	try:
+		text = fetch_csv_text(url, timeout=timeout)
+	except urllib.error.HTTPError as exc:
+		if exc.code in (404, 403):
+			return []
+		raise
+	if "maskfile" not in text:
+		return []
+	df = pd.read_csv(io.StringIO(text), comment="#")
+	return [
+		{"start": str(r.start_date), "end": str(r.end_date), "maskfile": str(r.maskfile)}
+		for r in df.dropna(subset=["maskfile"]).itertuples()
+	]
+
+
+def fetch_roi_mask(camera: str, maskfile: str, out_path, timeout: float = 30.0) -> str:
+	"""Download one ROI mask ``.tif`` from the archive to ``out_path``."""
+	from pathlib import Path
+
+	url = f"{ARCHIVE_BASE}/{camera}/ROI/{maskfile}"
+	with urllib.request.urlopen(url, timeout=timeout) as response:
+		data = response.read()
+		ctype = response.headers.get("Content-Type", "")
+	if not data or "html" in ctype.lower():
+		raise ValueError(f"No ROI mask at {url} content-type={ctype!r}")
+	out_path = Path(out_path)
+	out_path.parent.mkdir(parents=True, exist_ok=True)
+	out_path.write_bytes(data)
+	return str(out_path)

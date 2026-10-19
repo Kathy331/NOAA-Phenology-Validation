@@ -13,6 +13,10 @@ fetched per flagged ROI, so multi-ROI sites get each ROI's own phase dates.
 Dates with no photo on PhenoCam (within 2 days) are logged to
 ``phenocam_missing_images.csv`` and not retried.
 
+Each site/year folder also gets ``roi_mask_{roi}.png`` (ROI white on black,
+from PhenoCam's ``{roi}_roi.csv`` + ``.tif`` masks) and a side-by-side
+``_preview.png``; the photos themselves are never drawn on.
+
 Run:
     python anomaly_pipeline/fetch_outlier_phase_images.py --set good
     python anomaly_pipeline/fetch_outlier_phase_images.py --set both
@@ -42,7 +46,7 @@ from shared.data_collection import (  # noqa: E402
     write_lag_box_medians_by_site,
     write_lag_box_outliers_by_site,
 )
-from shared.phenocam_api import fetch_one_midday_image  # noqa: E402
+from shared.phenocam_api import fetch_one_midday_image, fetch_roi_mask, roi_mask_list  # noqa: E402
 
 OUTPUT = ROOT / "anomaly_pipeline" / "output"
 COMBINED = OUTPUT / "_combined"
@@ -52,6 +56,9 @@ OUTLIER_DIR = COMBINED / "phenocam_image_outlier"
 GOOD_DIR = COMBINED / "phenocam_image_good"
 LEGACY_DIR = COMBINED / "phenocam_image_test"
 MISSING_CSV = COMBINED / "phenocam_missing_images.csv"
+MASK_CACHE = COMBINED / "phenocam_roi_masks"
+MASK_PREFIX = "roi_mask_"
+MASK_VERSIONS_NOTE = "roi_masks.txt"
 
 
 def _year_of(folder: str) -> int:
@@ -307,6 +314,163 @@ def _download_set(
     return n_ok, n_miss, n_skip, manifest_rows
 
 
+def _mask_versions(cam: str, roi: str) -> list[dict]:
+    """ROI mask versions, cached as ``phenocam_roi_masks/{camera}/{roi}_versions.csv``."""
+    cached = MASK_CACHE / cam / f"{roi}_versions.csv"
+    if cached.exists():
+        df = pd.read_csv(cached, dtype=str)
+        return df.to_dict("records")
+    try:
+        versions = roi_mask_list(cam, roi)
+    except Exception as exc:
+        print(f"  mask list FAIL {roi}: {exc}")
+        return []
+    cached.parent.mkdir(parents=True, exist_ok=True)
+    pd.DataFrame(versions, columns=["start", "end", "maskfile"]).to_csv(cached, index=False)
+    return versions
+
+
+def masks_for_year(cam: str, roi: str, year: int) -> list[dict]:
+    lo, hi = f"{year}-01-01", f"{year}-12-31"
+    return [v for v in _mask_versions(cam, roi) if v["start"] <= hi and v["end"] >= lo]
+
+
+def _mask_tif(cam: str, maskfile: str) -> Path | None:
+    path = MASK_CACHE / cam / maskfile
+    if path.exists() and path.stat().st_size > 0:
+        return path
+    try:
+        fetch_roi_mask(cam, maskfile, path)
+        return path
+    except Exception as exc:
+        print(f"  mask FAIL {cam}/{maskfile}: {exc}")
+        return None
+
+
+def _preview_dates(job: dict, year: int, version: dict) -> list[str]:
+    """Candidate photo dates inside both ``year`` and the mask version's range, MOS first."""
+    lo = max(f"{year}-01-01", version["start"])
+    hi = min(f"{year}-12-31", version["end"])
+    out: list[str] = []
+    for phase in ("MOS", "DOS", "SOS", "EOS"):
+        for series in ("gvf", "gcc", "ndvi"):
+            iso = _doy_to_date(year, job.get(f"{series}_{phase.lower()}_{year}"))
+            if iso and lo <= iso <= hi and iso not in out:
+                out.append(iso)
+    mid = date.fromisoformat(lo) + (date.fromisoformat(hi) - date.fromisoformat(lo)) / 2
+    out.append(mid.isoformat())
+    return out
+
+
+def _preview_photo(cam: str, dates: list[str], missing: set[tuple[str, str]]) -> Path | None:
+    """A photo from the ROI's own camera, cached under ``phenocam_roi_masks/{camera}/photos``."""
+    for iso in dates[:4]:
+        path = MASK_CACHE / cam / "photos" / f"{cam}_{iso}.jpg"
+        if path.exists() and path.stat().st_size > 0:
+            return path
+        if (cam, iso) in missing:
+            continue
+        try:
+            fetch_one_midday_image(cam, path, date=iso)
+            return path
+        except Exception as exc:
+            if "No RGB midday JPEG" in str(exc):
+                missing.add((cam, iso))
+            print(f"  preview photo FAIL {cam} {iso}: {exc}")
+    return None
+
+
+def _write_mask_pngs(tif: Path, folder: Path, stem: str, roi: str, photo_path: Path | None) -> None:
+    from PIL import Image, ImageDraw, ImageFilter
+    import numpy as np
+
+    mask = Image.open(tif).convert("L")
+    inside = np.array(mask) < 128
+    Image.fromarray(np.where(inside, 255, 0).astype("uint8")).save(folder / f"{stem}.png")
+
+    if photo_path is None:
+        return
+    photo = Image.open(photo_path).convert("RGB")
+    roi_img = Image.fromarray(np.where(inside, 255, 0).astype("uint8"))
+    if roi_img.size != photo.size:
+        roi_img = roi_img.resize(photo.size, Image.NEAREST)
+    roi_arr = np.array(roi_img) > 0
+    edge = roi_arr & ~(np.array(roi_img.filter(ImageFilter.MinFilter(7))) > 0)
+
+    shaded = np.array(photo).astype("float32")
+    shaded[~roi_arr] *= 0.3
+    shaded[edge] = (255, 220, 0)
+    right = Image.fromarray(shaded.astype("uint8"))
+
+    w, h = photo.size
+    pad = 28
+    canvas = Image.new("RGB", (2 * w, h + pad), "white")
+    canvas.paste(photo, (0, pad))
+    canvas.paste(right, (w, pad))
+    draw = ImageDraw.Draw(canvas)
+    draw.text((8, 8), photo_path.name, fill="black")
+    draw.text((w + 8, 8), f"ROI {roi} ({tif.name})", fill="black")
+    if canvas.width > 1800:
+        canvas = canvas.resize((1800, round(canvas.height * 1800 / canvas.width)))
+    canvas.save(folder / f"{stem}_preview.png")
+
+
+def write_roi_masks(jobs: list[dict], dest_root: Path, year_list: list[int]) -> tuple[int, int]:
+    """Write ROI mask PNGs + side-by-side previews into each ``{VEG}/{site}/{year}`` folder."""
+    missing = _load_missing()
+    cleaned: set[Path] = set()
+    multi: dict[Path, list[str]] = {}
+    n_ok = n_miss = 0
+    for job in jobs:
+        site, roi = job["site"], job.get("roi")
+        if not isinstance(roi, str) or not roi:
+            continue
+        veg = str(job.get("veg") or "XX").upper()
+        cam = job.get("phenocam_site") or _phenocam_sitename(roi)
+        for year in year_list:
+            if not job.get(f"flags_{year}"):
+                continue
+            folder = dest_root / veg / site / str(year)
+            folder.mkdir(parents=True, exist_ok=True)
+            if folder not in cleaned:
+                for old in [*folder.glob(f"{MASK_PREFIX}*"), *folder.glob(MASK_VERSIONS_NOTE)]:
+                    old.unlink()
+                cleaned.add(folder)
+            versions = masks_for_year(cam, roi, year)
+            if not versions:
+                n_miss += 1
+                print(f"  no ROI mask for {roi} in {year}")
+                continue
+            for v in versions:
+                tif = _mask_tif(cam, v["maskfile"])
+                if tif is None:
+                    n_miss += 1
+                    continue
+                suffix = f"_{Path(v['maskfile']).stem.rsplit('_', 1)[-1]}" if len(versions) > 1 else ""
+                stem = f"{MASK_PREFIX}{roi}{suffix}"
+                photo = _preview_photo(cam, _preview_dates(job, year, v), missing)
+                _write_mask_pngs(tif, folder, stem, roi, photo)
+                n_ok += 1
+                if len(versions) > 1:
+                    end = "still active" if v["end"].startswith("9999") else v["end"]
+                    multi.setdefault(folder, []).append(f"{stem}.png  {v['maskfile']}  {v['start']} to {end}")
+    for folder, lines in multi.items():
+        (folder / MASK_VERSIONS_NOTE).write_text(
+            "The ROI mask changed during this year; each mask applies to its date range.\n"
+            + "\n".join(lines) + "\n"
+        )
+    _save_missing(missing)
+    print(f"masks  wrote={n_ok} missing={n_miss} -> {dest_root}")
+    return n_ok, n_miss
+
+
+def _mask_note(folder: Path, roi: str) -> str:
+    names = sorted(
+        p.name for p in folder.glob(f"{MASK_PREFIX}{roi}*.png") if not p.stem.endswith("_preview")
+    )
+    return "mask: " + (", ".join(names) + " (+ _preview.png)" if names else "none available on PhenoCam")
+
+
 NOTE_NAME = "outlier_phases.txt"
 _COMP_PHASES = {"greenup": ("SOS", "MOS"), "senescence": ("DOS", "EOS")}
 
@@ -389,6 +553,7 @@ def write_outlier_notes(scores_by_year: dict, site_vegs: dict[str, str]) -> int:
                 row = _score_row(clean, site, roi)
                 cam = _phenocam_sitename(roi)
                 lines.append(f"ROI: {roi}   (camera: {cam})")
+                lines.append(_mask_note(folder, roi))
                 lines.append("")
 
                 def imgs(ph):
@@ -465,6 +630,7 @@ def main() -> int:
     p.add_argument("--skip-download", action="store_true", help="only rewrite the CSVs with phase DOYs")
     p.add_argument("--no-rewrite", action="store_true", help="do not rewrite the outlier/median CSVs")
     p.add_argument("--set", dest="which", choices=("outlier", "good", "both"), default="both")
+    p.add_argument("--no-masks", action="store_true", help="do not write ROI mask PNGs / previews")
     args = p.parse_args()
 
     scores_by_year = _load_scores(DEFAULT_FOLDERS)
@@ -493,7 +659,16 @@ def main() -> int:
     reorg_legacy_images(veg_map)
     site_vegs = _outlier_site_vegs(comp_table, lag_table, year_list)
 
+    def masks() -> None:
+        if args.no_masks:
+            return
+        if args.which in ("outlier", "both"):
+            write_roi_masks(_outlier_roi_jobs(scores_by_year, site_vegs), OUTLIER_DIR, year_list)
+        if args.which in ("good", "both"):
+            write_roi_masks(_merge_site_rows((("median", median_table),), year_list), GOOD_DIR, year_list)
+
     if args.skip_download:
+        masks()
         write_outlier_notes(scores_by_year, site_vegs)
         print("skip-download: CSVs updated; image folders reorganized")
         return 0
@@ -526,6 +701,7 @@ def main() -> int:
         n_skip += skip
         all_rows.extend(rows)
 
+    masks()
     write_outlier_notes(scores_by_year, site_vegs)
     man = COMBINED / "phenocam_phase_images_manifest.csv"
     pd.DataFrame(all_rows).to_csv(man, index=False)
