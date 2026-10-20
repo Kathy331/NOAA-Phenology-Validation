@@ -51,6 +51,7 @@ package imports with no extra step --> just run the commands below.
   go under `anomaly_pipeline/output/_combined/` (`golden_standard_ranking.csv`,
   `Lag_2023_2024.png`, `Compression_2023_2024.png`,
   `Lag_direction_box_2023_2024.png` + `Lag_direction_box_2023_2024_stats.csv`,
+  `Sites_for_2025.xlsx` (2024 box-plot sites, and the subset also in 2023),
   `Lag_box_outliers_by_site_2023_2024.csv` — one row
   per box-plot outlier site with per-year flags, lat/lon, water/urban fraction and divergences,
   `Compression_ref_outliers_by_site_2023_2024.csv` + `Compression_ref_outliers_2023_2024.png`
@@ -190,6 +191,11 @@ summaries (golden ranking + year-vs-year figures) go to
 `anomaly_pipeline/output/_combined/`.
 
 ### Reading the lag box plots and their statistics
+
+How the sites are chosen, from the data checks through the q-value test, is
+written out in [`doc/Lag_direction_box.md`](doc/Lag_direction_box.md). The
+2025 site list built with those same rules is
+`anomaly_pipeline/output/_combined/Sites_for_2025.xlsx`.
 
 **What the plot shows.** `lag_direction_box.png` and
 `Lag_direction_box_2023_2024.png` answer one question: *does the satellite

@@ -54,6 +54,7 @@ DEFAULT_FOLDERS = ["Satellite_GVF_timeseries_2023", "Satellite_GVF_timeseries_20
 SERIES = ("gcc", "ndvi", "gvf")
 OUTLIER_DIR = COMBINED / "phenocam_image_outlier"
 GOOD_DIR = COMBINED / "phenocam_image_good"
+ALL_DIR = COMBINED / "phenocam_image_all"
 LEGACY_DIR = COMBINED / "phenocam_image_test"
 MISSING_CSV = COMBINED / "phenocam_missing_images.csv"
 MASK_CACHE = COMBINED / "phenocam_roi_masks"
@@ -255,7 +256,8 @@ def _download_set(
     dest_root.mkdir(parents=True, exist_ok=True)
     for i, recd in enumerate(sites, 1):
         site = recd["site"]
-        veg = str(recd.get("veg") or "XX").upper()
+        raw_veg = str(recd.get("veg") or "XX")
+        veg = raw_veg if "/" in raw_veg else raw_veg.upper()
         cam = recd.get("phenocam_site") or site
         src = ",".join(sorted(recd.get("sources") or []))
         print(f"[{i}/{len(sites)}] {veg}/{site}  camera={cam}  ({src})")
@@ -425,7 +427,8 @@ def write_roi_masks(jobs: list[dict], dest_root: Path, year_list: list[int]) -> 
         site, roi = job["site"], job.get("roi")
         if not isinstance(roi, str) or not roi:
             continue
-        veg = str(job.get("veg") or "XX").upper()
+        raw_veg = str(job.get("veg") or "XX")
+        veg = raw_veg if "/" in raw_veg else raw_veg.upper()
         cam = job.get("phenocam_site") or _phenocam_sitename(roi)
         for year in year_list:
             if not job.get(f"flags_{year}"):
@@ -524,14 +527,23 @@ def _lag_suspect(flags_at_phase: set[str]) -> str:
     return f"{ref} (GVF still agrees with {other} at this phase)"
 
 
-def write_outlier_notes(scores_by_year: dict, site_vegs: dict[str, str]) -> int:
+def write_outlier_notes(
+    scores_by_year: dict,
+    site_vegs: dict[str, str],
+    *,
+    root: Path | None = None,
+    include_rois: set | None = None,
+) -> int:
     """Write ``{VEG}/{site}/{year}/outlier_phases.txt`` for every flagged site-year.
 
     Recomputed from scores on each run (same fences as the CSVs), so stale notes
-    are removed first and new outliers always get one.
+    are removed first and new outliers always get one. ``include_rois`` limits
+    the notes to ``(site, roi, year)`` triples (used by the DB-only tree).
     """
-    for old in OUTLIER_DIR.rglob(NOTE_NAME):
-        old.unlink()
+    root = root or OUTLIER_DIR
+    if include_rois is None:
+        for old in root.rglob(NOTE_NAME):
+            old.unlink()
 
     missing = _load_missing()
     written = 0
@@ -542,13 +554,17 @@ def write_outlier_notes(scores_by_year: dict, site_vegs: dict[str, str]) -> int:
         sites = sorted(set(lag.get("site", [])) | set(comp.get("site", [])))
         for site in sites:
             veg = site_vegs.get(site) or "XX"
-            folder = OUTLIER_DIR / veg / site / str(year)
-            folder.mkdir(parents=True, exist_ok=True)
+            folder = root / veg / site / str(year)
             lag_s = lag[lag["site"].eq(site)] if len(lag) else lag
             comp_s = comp[comp["site"].eq(site)] if len(comp) else comp
             rois = sorted(set(lag_s.get("roi", [])) | set(comp_s.get("roi", [])))
+            if include_rois is not None:
+                rois = [roi for roi in rois if (site, roi, year) in include_rois]
+            if not rois:
+                continue
+            folder.mkdir(parents=True, exist_ok=True)
 
-            lines = [f"{site} ({veg}) {year} - why this site-year is an outlier", ""]
+            lines = [f"{site} ({veg.split('/')[0]}) {year} - why this site-year is an outlier", ""]
             for roi in rois:
                 row = _score_row(clean, site, roi)
                 cam = _phenocam_sitename(roi)
@@ -620,8 +636,75 @@ def write_outlier_notes(scores_by_year: dict, site_vegs: dict[str, str]) -> int:
             )
             (folder / NOTE_NAME).write_text("\n".join(lines) + "\n")
             written += 1
-    print(f"notes  wrote {written} {NOTE_NAME} files under {OUTLIER_DIR}")
+    print(f"notes  wrote {written} {NOTE_NAME} files under {root}")
     return written
+
+
+def _db_jobs(scores_by_year: dict) -> tuple[list[dict], list[dict], set]:
+    """Every non-spin-up DB camera view, split by the same lag/compression flags."""
+    flagged: set[tuple] = set()
+    outlier_jobs: dict[tuple, dict] = {}
+    plain_jobs: dict[tuple, dict] = {}
+    for year, clean in sorted(scores_by_year.items()):
+        db = clean.loc[clean["veg"].astype(str).str.upper().eq("DB")]
+        lag = find_lag_box_outliers(clean)
+        comp = find_compression_ref_outliers(clean)
+        bad = set()
+        for frame in (lag, comp):
+            if frame is None or frame.empty or "veg" not in frame.columns:
+                continue
+            part = frame.loc[frame["veg"].astype(str).str.upper().eq("DB")]
+            bad.update(zip(part["site"], part["roi"]))
+        for rec in db.to_dict("records"):
+            site, roi = rec["site"], rec["roi"]
+            flagged_year = (site, roi) in bad
+            if flagged_year:
+                flagged.add((site, roi, year))
+            bucket = outlier_jobs if flagged_year else plain_jobs
+            veg = "DB/outlier" if flagged_year else "DB/not_outlier"
+            job = bucket.setdefault((site, roi), {
+                "site": site,
+                "roi": roi,
+                "veg": veg,
+                "phenocam_site": _phenocam_sitename(roi),
+                "sources": {"db-all"},
+            })
+            job[f"flags_{year}"] = 1
+            row = pd.Series(rec)
+            for series in SERIES:
+                for phase in PHASE_KEYS:
+                    job[f"{series}_{phase.lower()}_{year}"] = _doy(row, f"{series}_{phase.lower()}")
+    return list(outlier_jobs.values()), list(plain_jobs.values()), flagged
+
+
+def build_db_all_images() -> None:
+    """Phase photos and ROI masks for every DB site-year, split outlier / not_outlier."""
+    scores_by_year = _load_scores(DEFAULT_FOLDERS)
+    year_list = sorted(scores_by_year)
+    outlier_jobs, plain_jobs, flagged = _db_jobs(scores_by_year)
+    print(f"DB outlier rois={len(outlier_jobs)}  not_outlier rois={len(plain_jobs)}")
+
+    jpeg_cache: dict[tuple[str, str], Path] = {}
+    _seed_cache([OUTLIER_DIR, GOOD_DIR, ALL_DIR, MASK_CACHE], jpeg_cache)
+    missing = _load_missing()
+    for jobs in (outlier_jobs, plain_jobs):
+        _download_set(jobs, ALL_DIR, year_list, jpeg_cache=jpeg_cache, missing=missing)
+        _save_missing(missing)
+        write_roi_masks(jobs, ALL_DIR, year_list)
+
+    site_vegs = {job["site"]: "DB/outlier" for job in outlier_jobs}
+    write_outlier_notes(scores_by_year, site_vegs, root=ALL_DIR, include_rois=flagged)
+    for job in plain_jobs:
+        for year in year_list:
+            if not job.get(f"flags_{year}"):
+                continue
+            folder = ALL_DIR / "DB" / "not_outlier" / job["site"] / str(year)
+            folder.mkdir(parents=True, exist_ok=True)
+            (folder / "not_outlier.txt").write_text(
+                f"{job['site']} (DB) {year} - inside the lag and compression fences.\n"
+                f"ROI: {job['roi']}   (camera: {job['phenocam_site']})\n"
+            )
+    print(f"DB image tree -> {ALL_DIR}")
 
 
 def main() -> int:
