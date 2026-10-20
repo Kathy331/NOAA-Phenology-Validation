@@ -1,5 +1,0 @@
-source,gvf_vs_gcc_div_count,gvf_vs_gcc_div_mean,gvf_vs_gcc_div_median,gvf_vs_ndvi_div_count,gvf_vs_ndvi_div_mean,gvf_vs_ndvi_div_median,gcc_vs_ndvi_div_count,gcc_vs_ndvi_div_mean,gcc_vs_ndvi_div_median
-GBOV_2023,9,2.951,2.581,10,3.319,2.389,9,2.903,1.548
-GBOV_2024,11,2.668,1.973,11,2.743,2.32,11,2.59,1.572
-GoldenSites_2023,22,2.257,1.989,22,1.919,1.811,22,1.678,1.087
-GoldenSites_2024,16,2.747,2.08,16,2.617,2.016,16,2.479,1.819

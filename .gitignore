@@ -9,6 +9,9 @@ prep_pipeline/output/api/*
 #validation stage plots (regenerated from the input JSONs); keep input JSONs
 plotting_pipeline/output/
 
+# cross-year outlier tables + PhenoCam phase images
+anomaly_pipeline/output/_combined/
+
 
 #personal notes
 local_notes/
