@@ -1301,6 +1301,93 @@ def _draw_lag_boxes(ax, vegs, year_df, refs, xcap, phase):
 	return stats_rows
 
 
+def plot_db_site_lag(
+	year_df: pd.DataFrame,
+	site: str,
+	out_png: str | Path,
+	year: int,
+	*,
+	q_lookup: dict | None = None,
+	refs=("ndvi", "gcc"),
+	xcap: float = 90.0,
+) -> Path:
+	"""DB-only lag boxes for one year, with a red dot at ``site``.
+
+	The boxes are the same DB distribution as the combined lag figure. ``q_lookup``
+	maps ``(reference, phase)`` to the q already printed on that figure (adjusted
+	across every box, not just these eight). One red dot per camera view.
+	"""
+	import matplotlib
+
+	matplotlib.use("Agg")
+	import matplotlib.pyplot as plt
+	import numpy as np
+
+	out_png = Path(out_png)
+	refs = [r for r in refs if r in _LAG_REFS] or ["ndvi", "gcc"]
+	db = year_df.loc[year_df["veg"].astype(str).str.upper().eq("DB")].copy()
+	mine = db.loc[db["site"].astype(str).eq(str(site))]
+	phases = _LAG_PHASE_ORDER
+	offsets = _lag_ref_offsets(len(refs))
+
+	fig, axes = plt.subplots(1, len(phases), figsize=(4.4 * len(phases), 3.1), sharey=True)
+	for ax, phase in zip(axes, phases):
+		rows = _draw_lag_boxes(ax, ["DB"], db, refs, xcap, phase)
+		for row in rows:
+			q = (q_lookup or {}).get((row["ref"].upper(), phase), np.nan)
+			ax.text(
+				xcap + 12, row["ypos"], _fmt_q(q), va="center", ha="left", fontsize=7,
+				color=_REF_DOT_COLORS.get(row["ref"], "#555"),
+				fontweight="bold" if q == q and q < 0.05 else "normal", zorder=4,
+			)
+		for k, ref in enumerate(refs):
+			col = _LAG_REFS[ref]["cols"][phase]
+			if col not in mine.columns or mine.empty:
+				continue
+			for i, rec in enumerate(mine.itertuples()):
+				raw = getattr(rec, col, None)
+				if raw is None or (isinstance(raw, float) and np.isnan(raw)):
+					continue
+				try:
+					lag = float(raw)
+				except (TypeError, ValueError):
+					continue
+				if not np.isfinite(lag):
+					continue
+				shown = float(np.clip(lag, -xcap, xcap))
+				# A second camera view sits just beside the first so both dots stay visible.
+				y = offsets[k] + (i - (len(mine) - 1) / 2) * 0.12
+				ax.scatter(
+					[shown], [y], s=46, c="#d62728", edgecolors="white",
+					linewidths=0.7, zorder=6,
+				)
+		ax.set_title(phase, fontsize=12, fontweight="bold")
+		ax.set_xlabel("lag (days)", fontsize=8)
+	axes[0].set_yticks([0])
+	axes[0].set_yticklabels([f"DB (n={len(db)})"], fontsize=9)
+	axes[0].set_ylim(-0.7, 0.7)
+	axes[0].invert_yaxis()
+	fig.suptitle(
+		f"{site} {year}   red dot = this site    left of 0 = satellite earlier",
+		fontsize=12, fontweight="bold",
+	)
+	from matplotlib.lines import Line2D
+	from matplotlib.patches import Patch
+	handles = [
+		Patch(facecolor=_REF_DOT_COLORS.get(r, "#555"), edgecolor="white", label=_LAG_REFS[r]["label"])
+		for r in refs
+	]
+	handles.append(Line2D([0], [0], marker="o", color="none", markerfacecolor="#d62728",
+		markeredgecolor="white", markersize=7, label="this site"))
+	fig.legend(handles=handles, loc="lower center", ncol=len(handles),
+		bbox_to_anchor=(0.5, -0.02), frameon=True, fontsize=8)
+	fig.tight_layout(rect=[0, 0.06, 1, 0.90])
+	out_png.parent.mkdir(parents=True, exist_ok=True)
+	fig.savefig(out_png, dpi=140, bbox_inches="tight")
+	plt.close(fig)
+	return out_png
+
+
 def plot_lag_reference_box(
 	df: pd.DataFrame, out_png: str | Path, title_prefix: str,
 	refs=("ndvi", "gcc"), min_n: int = 5, xcap: float = 90.0,

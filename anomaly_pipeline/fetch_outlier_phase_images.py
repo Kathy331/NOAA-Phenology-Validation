@@ -704,7 +704,38 @@ def build_db_all_images() -> None:
                 f"{job['site']} (DB) {year} - inside the lag and compression fences.\n"
                 f"ROI: {job['roi']}   (camera: {job['phenocam_site']})\n"
             )
+    _write_db_site_lag_plots(scores_by_year)
     print(f"DB image tree -> {ALL_DIR}")
+
+
+def _write_db_site_lag_plots(scores_by_year: dict) -> int:
+    """One DB lag-box PNG per site-year folder, with that site marked in red."""
+    from shared.data_collection import plot_db_site_lag
+
+    stats_path = COMBINED / "Lag_direction_box_2023_2024_stats.csv"
+    q_lookup: dict[tuple, dict] = {}
+    if stats_path.exists():
+        stats = pd.read_csv(stats_path)
+        db_stats = stats.loc[stats["veg"].astype(str).str.upper().eq("DB")]
+        for rec in db_stats.itertuples():
+            q_lookup.setdefault(int(rec.year), {})[(str(rec.reference).upper(), rec.phase)] = float(rec.q_bh)
+    written = 0
+    for split in ("outlier", "not_outlier"):
+        root = ALL_DIR / "DB" / split
+        if not root.exists():
+            continue
+        for site_dir in sorted(p for p in root.iterdir() if p.is_dir()):
+            for year_dir in sorted(p for p in site_dir.iterdir() if p.is_dir() and p.name.isdigit()):
+                year = int(year_dir.name)
+                if year not in scores_by_year:
+                    continue
+                plot_db_site_lag(
+                    scores_by_year[year], site_dir.name, year_dir / "lag_direction.png", year,
+                    q_lookup=q_lookup.get(year),
+                )
+                written += 1
+    print(f"lag plots  wrote={written}")
+    return written
 
 
 def main() -> int:
